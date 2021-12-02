@@ -5,8 +5,8 @@ const fs = require('fs');
 const port = 8080
 
 const options = {
-  key: fs.readFileSync('./openssl/cptdagw.org.svr.key'),
-  cert: fs.readFileSync('./openssl/cptdagw.org.svr.crt')
+  key: fs.readFileSync('./openssl/svr.key'),
+  cert: fs.readFileSync('./openssl/svr.crt')
 };
 
 var server = https.createServer(options);

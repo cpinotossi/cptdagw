@@ -1,0 +1,13 @@
+#cloud-config
+package_upgrade: true
+packages:
+  - nodejs
+  - npm
+runcmd:
+  - npm install -g pm2
+  - curl -o server.js https://raw.githubusercontent.com/cpinotossi/cptdagw/master/server.js
+  - chmod +x ./server.js
+  - mkdir openssl
+  - curl -o openssl/svr.key https://raw.githubusercontent.com/cpinotossi/cptdagw/master/openssl/svr.key
+  - curl -o openssl/svr.crt https://raw.githubusercontent.com/cpinotossi/cptdagw/master/openssl/svr.crt
+  - pm2 start ./server.js

@@ -1,0 +1,32 @@
+[req]
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+C = DE
+ST = Bavaria
+L = Munich
+O = Edge Development
+CN = test.cptdagw.org
+
+[req_distinguished_name_ca]
+C = DE
+ST = Bavaria
+L = Munich
+O = Edge Development
+CN = cptdagw.org CA
+
+[v3_ca]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer:always
+basicConstraints = critical, CA:true, pathlen:0
+keyUsage = critical, digitalSignature, cRLSign, keyCertSign
+
+[v3_req]
+keyUsage = keyEncipherment, dataEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+[alt_names]
+DNS.1 = test.cptdagw.org
+DNS.2 = *.cptdagw.org

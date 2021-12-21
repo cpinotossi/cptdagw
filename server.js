@@ -25,7 +25,7 @@ serverSSL.on('request',(req,res)=>{
     res.write(JSON.stringify(socketDetails, null, '\t'));
     res.end();
 });
-serverSSL.listen(portSSL,()=>{
+serverSSL.listen(portSSL,'0.0.0.0',()=>{
     console.log(`Server waiting on port ${portSSL} for you`)
 })
 
@@ -41,6 +41,6 @@ server.on('request',(req,res)=>{
     res.end();
 });
 
-server.listen(port,()=>{
+server.listen(port,'0.0.0.0',()=>{
     console.log(`Server waiting on port ${port} for you`)
 })

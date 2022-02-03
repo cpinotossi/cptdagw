@@ -1,7 +1,7 @@
 targetScope='resourceGroup'
 
 var parameters = json(loadTextContent('../parameters.json'))
-var servercertificatefrontend = loadFileAsBase64('../openssl/svr.pfx')
+var servercertificatefrontend = loadFileAsBase64('../openssl/srv.pfx')
 var cacertificatebackend = loadFileAsBase64('../openssl/ca.crt')
 
 resource vnet 'Microsoft.Network/virtualNetworks@2021-03-01' existing = {

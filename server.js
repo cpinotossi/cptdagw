@@ -4,6 +4,9 @@ const http = require('http');
 const fs = require('fs');
 const url = require('url');
 
+let args=process.argv;
+let color=args[2];
+
 // Object which will be printed on server response
 let socketDetails = {
     ladd:'',
@@ -34,13 +37,14 @@ serverSSL.on('request',(req,res)=>{
     socketDetails.lport = req.socket.localPort;
     socketDetails.radd = req.socket.remoteAddress;
     socketDetails.rport = req.socket.remotePort;
-
+    res.write(`<body bgcolor="${color}">\n`);
     res.write(`${JSON.stringify(req.headers, null, '\t')}\n`);
     res.write(`${JSON.stringify(socketDetails, null, '\t')}\n`);    
     //Verify if user did send client certificate.
     if (req.socket.authorized){
         res.write(`client-cert:${req.socket.getPeerCertificate().subject.CN}\n`);
     }
+    res.write(`</body>\n`);
     res.end();
 });
 serverSSL.listen(portSSL,'0.0.0.0',()=>{

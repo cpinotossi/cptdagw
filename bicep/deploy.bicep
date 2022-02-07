@@ -63,6 +63,6 @@ module lawModule 'law.bicep' = {
     location: location
   }
   dependsOn:[
-    sabModule
+    agwModule
   ]
 }

@@ -1,14 +1,18 @@
 targetScope='resourceGroup'
 
-var parameters = json(loadTextContent('../parameters.json'))
+param prefix string = 'cptd'
+param location string = 'eastus'
+param myObjectId string
+param myip string
+
 
 resource vnet 'Microsoft.Network/virtualNetworks@2021-03-01' existing = {
-  name: parameters.prefix
+  name: prefix
 }
 
 resource sa 'Microsoft.Storage/storageAccounts@2021-06-01' = {
-  name: parameters.prefix
-  location: parameters.location
+  name: prefix
+  location: location
   sku: {
     name: 'Standard_LRS'
   }
@@ -19,14 +23,14 @@ resource sa 'Microsoft.Storage/storageAccounts@2021-06-01' = {
       bypass: 'AzureServices'
       virtualNetworkRules: [
         {
-          id: '${vnet.id}/subnets/${parameters.prefix}agw'
+          id: '${vnet.id}/subnets/${prefix}agw'
           action: 'Allow'
           state: 'Succeeded'
         }
       ]
       ipRules: [
         {
-          value: '93.230.208.209'
+          value: myip
           action: 'Allow'
         }
       ]
@@ -43,7 +47,7 @@ resource sab 'Microsoft.Storage/storageAccounts/blobServices@2021-06-01' = {
 
 resource sac 'Microsoft.Storage/storageAccounts/blobServices/containers@2021-06-01' = {
   parent: sab
-  name: parameters.prefix
+  name: prefix
   properties: {
     publicAccess: 'Blob'
   }
@@ -54,7 +58,7 @@ var roleStorageBlobDataContributorName = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe' 
 resource rablobcontributor 'Microsoft.Authorization/roleAssignments@2018-01-01-preview' = {
   name: guid(resourceGroup().id,'rablobcontributort')
   properties: {
-    principalId: parameters.myObjectId
+    principalId: myObjectId
     roleDefinitionId: tenantResourceId('Microsoft.Authorization/RoleDefinitions',roleStorageBlobDataContributorName)
   }
 }

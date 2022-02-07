@@ -6,9 +6,11 @@ packages:
 runcmd:
   - npm install -g pm2
   - curl -o server.js https://raw.githubusercontent.com/cpinotossi/cptdagw/master/server.js
-  - chmod +x /server.js
+  - chmod +x server.js
   - mkdir openssl
   - curl -o openssl/srv.key https://raw.githubusercontent.com/cpinotossi/cptdagw/master/openssl/srv.key
   - curl -o openssl/srv.crt https://raw.githubusercontent.com/cpinotossi/cptdagw/master/openssl/srv.crt
   - curl -o openssl/ca.crt https://raw.githubusercontent.com/cpinotossi/cptdagw/master/openssl/ca.crt
-  - pm2 start /./server.js
+  - curl -o openssl/alice.crt https://raw.githubusercontent.com/cpinotossi/cptdagw/master/openssl/alice.crt
+  - curl -o openssl/alice.key https://raw.githubusercontent.com/cpinotossi/cptdagw/master/openssl/alice.key
+  - pm2 start server.js

@@ -4,7 +4,7 @@ param prefix string = 'cptd'
 param location string = 'eastus'
 
 resource vnet 'Microsoft.Network/virtualNetworks@2020-08-01' = {
-  name: '${prefix}'
+  name: prefix
   location: location
   properties: {
     addressSpace: {
@@ -14,17 +14,12 @@ resource vnet 'Microsoft.Network/virtualNetworks@2020-08-01' = {
     }
     subnets: [
       {
-        name: '${prefix}agw'
+        name: prefix
         properties: {
           addressPrefix: '10.0.0.0/24'
           delegations: []
           privateEndpointNetworkPolicies: 'Enabled'
           privateLinkServiceNetworkPolicies: 'Enabled'
-          serviceEndpoints:[
-            {
-                'service': 'Microsoft.Storage'
-            }
-          ]
         }
       }
       {
@@ -37,12 +32,17 @@ resource vnet 'Microsoft.Network/virtualNetworks@2020-08-01' = {
         }
       }
       {
-        name: '${prefix}'
+        name: '${prefix}agw'
         properties: {
-          addressPrefix: '10.0.0.0/24'
+          addressPrefix: '10.0.2.0/24'
           delegations: []
           privateEndpointNetworkPolicies: 'Enabled'
           privateLinkServiceNetworkPolicies: 'Enabled'
+          serviceEndpoints:[
+            {
+                'service': 'Microsoft.Storage'
+            }
+          ]
         }
       }
     ]
@@ -69,10 +69,13 @@ resource bastion 'Microsoft.Network/bastionHosts@2021-03-01' = {
     name:'Standard'
   }
   properties: {
+    dnsName:'${prefix}.bastion.azure.com'
+    enableTunneling: true
     ipConfigurations: [
       {
         name: '${prefix}bastion'
         properties: {
+          privateIPAllocationMethod: 'Dynamic'
           publicIPAddress: {
             id: pubipbastion.id
           }

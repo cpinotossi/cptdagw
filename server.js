@@ -25,8 +25,7 @@ const optionsSSL = {
   requestCert: true,
   rejectUnauthorized: false, // so we can do own error handling
   ca: [
-    fs.readFileSync('./openssl/ca.crt'),
-    fs.readFileSync('./openssl/srv.crt')
+    fs.readFileSync('./openssl/ca.crt')
   ]
 };
 

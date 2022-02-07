@@ -5,170 +5,98 @@
 Create application gateway with
 - self signed server certificate for frontend and backend (will use the same cert for both).
 - waf custom rule (scope httplistener).
-- diagnostic settings setup
+- client certificate support on application gateway.
 
-### Create resource group
 
-~~~bash
-az group create -n cptdagw -l eastus
+### Deploy 
+
+Define certain variables we will need
+~~~ text
+prefix=cptdagw
+rg=${prefix}
+myobjectid=$(az ad user list --query '[?displayName==`chpinoto`].objectId' -o tsv)
+myip=$(curl ifconfig.io)
+az group create -n $rg -l eastus
+az deployment group create -n create-vnet -g $rg --template-file bicep/deploy.bicep -p myobjectid=$myobjectid myip=$myip
 ~~~
 
-### Modify Parameters File
+Verify if backend is working.
 
-Retrieve your object ID and update value "MY-OBJECT-ID" of the "myObjectId" property inside parameters.json accordently.
-NOTE: Replace YOUR-USR-NAME with your account name in the following command
-
-~~~bash
-az ad user list --query '[?displayName==`YOUR-USER-NAME`].objectId'
+~~~ text
+az network application-gateway show-backend-health -n $prefix -g $rg --query backendAddressPools[].backendHttpSettingsCollection[].servers[]
 ~~~
 
-NOTE:
-Your object ID is needed to assign you azure storage blob storage contributor role.
+### Test Client Certificates
 
-### Create certificates 
+Get the AGW private IP.
 
-IMPORTANT: This step is option and if done you will need to update certain files. Instead you can just use the certificates already created under the folder openssl.
-
-Certificates will be created with the help of openssl and a corresponding config file (certificate.cnf).
-
-~~~bash
-./create.certificates.sh
+~~~ text
+az network application-gateway show -n $prefix -g $rg --query frontendIpConfigurations[].privateIpAddress -o tsv
 ~~~
 
-NOTE: The server certificate is referenced inside the bicep/agw.bicep file.
+Log into the vm via bastion and send a request via curl with a valid Client Certificate.
 
-~~~bicep
-var servercertificatefrontend = loadFileAsBase64('../openssl/cptdagw.org.svr.pfx')
-var cacertificatebackend = loadFileAsBase64('../openssl/cptdagw.org.ca.crt')
+~~~ text
+cd /
+curl -v -k --cert openssl/alice.crt --key openssl/alice.key https://test.cptdagw.org/ --resolve test.cptdagw.org:443:10.0.2.4
 ~~~
 
-### Create the vnet
+> NOTE: We need the curl flag '--resolve' because of [sni](http://www.sigexec.com/posts/curl-and-the-tls-sni-extension/). 
 
-~~~bash
-az deployment group create -n create-vnet -g cptdagw --template-file bicep/vnet.bicep
-~~~
+Output should be HTTP 200 OK.
 
-### Create Storage Account with Blob
-
-~~~bash
-az deployment group create -n create-blob -g cptdagw --template-file bicep/sab.bicep
-~~~
-
-### Upload test.txt file
-
-Following lines do not work:
-
-~~~bash
-keyctl session workaroundSession
-azcopy login --tenant-id myedge.org
-echo 'hello world' | azcopy cp https://cptdagw.blob.core.windows.net/cptdagw/test.txt 
-~~~
-
-NOTE: 
-You will need to upload via powershell, portal or storage explorer.
-
-### List storage account container
-
-~~~bash
-azcopy list https://cptdagw.blob.core.windows.net/cptdagw
-~~~
-
-### Create Application Gateway
-
-~~~bash
-az deployment group create -n create-agw -g cptdagw --template-file bicep/agw.bicep
-~~~
-
-### Setup node.js https server on vm
-
-IMPORTANT:
-This setup is optional. Everything will be already setup via the cloud-init file which does get used during the vm deployment.
-But in case you like to setup the server by yourself (w/o the cloud-init) file please read the following section.
-
-The following instruction is based on the following article:
-- https://www.digitalocean.com/community/tutorials/how-to-set-up-a-node-js-application-for-production-on-ubuntu-16-04
-
-Log into the vm via azure bastion host.
-
-Clone the git repo.
-
-~~~bash
-github clone https://github.com/cpinotossi/cptdagw.git
-~~~
-
-Switch folder.
-
-~~~bash
-cd cptdagw
-~~~
-
-Make server.js executable.
-
-~~~bash
-chmod +x ./server.js
-~~~
-
-Install NPM module.
-
-~~~bash
-sudo npm install -g pm2
-~~~
-
-Run server.js as service
-
-~~~bash
-pm2 start ./server.js
-~~~
-
-### Send request via vm
-
-Get AGW private IP
-
-~~~bash
-az network application-gateway show -n cptdagw -g cptdagw --query frontendIpConfigurations[].privateIpAddress
-~~~
-
-NOTE:
-You can get the public IP as follow
-
-~~~bash
-az network public-ip show -n cptdagw -g cptdagw --query ipAddress
-~~~
-
-Log into the vm via bastion and send a request via curl.
-
-~~~bash
-# 200 OK
- curl -k -H'host:test.cptdagw.org' 'https://10.0.0.4/'
-{
-"x-forwarded-proto": "https",
-"x-forwarded-port": "443",
-"x-forwarded-for": "10.0.2.4:47904",
-"x-original-url": "/",
-"connection": "keep-alive",
-"x-appgw-trace-id": "fbb1e0f840243e440e74de29ea5581bc",
-"host": "test.cptdagw.org",
-"x-original-host": "test.cptdagw.org",
-"user-agent": "curl/7.58.0",
-"accept": "*/*"
-}
-# Blocked by WAF
-curl -k -v -H'host:test.cptdagw.org' 'https://10.0.0.4/?cpt=evil2'
-HTTP/1.1 403 Forbidden
-
-# 200 OK (No WAF configured)
-curl -k -v -H'host:test.cptdagw.org' 'http://10.0.0.4/cptdagw/test.txt?cpt=evil2'
+~~~ text
 HTTP/1.1 200 OK
 ~~~
 
-### Find the corresponding log
+Send request without Client Certificate.
+
+~~~ text
+curl -v -k --tlsv1.2 https://test.cptdagw.org/ --resolve test.cptdagw.org:443:10.0.2.4
+~~~
+
+You should receive an 400 Bad Request.
+
+~~~ text
+HTTP/1.1 400 Bad Request
+~~~
+
+~~~ text
+echo quit | openssl s_client -showcerts -connect 10.0.2.4:443 -servername test.cptdagw.org:443
+~~~
+
+There you can see which client certificate CAs our server supports:
+
+~~~ text
+---
+Acceptable client certificate CA names
+CN = cptdagw.org CA
+~~~
+
+### Test WAF
+
+Without the query parameter cpt=evil you should receive an 200 OK.
+
+~~~ text
+ curl -H"host: test.cptdagw.org" http://10.0.2.4/
+~~~
+
+Blocked by WAF
+
+~~~ text
+curl -v -H"host: test.cptdagw.org" "http://10.0.2.4/?cpt=evil"
+~~~
+
+You should receive HTTP 403 Forbidden.
+
 
 Get the log analytics workspace id.
 
 ~~~bash
-law=$(az monitor log-analytics workspace show -g cptdagw -n cptdagw --query customerId |sed 's/"//g')
+law=$(az monitor log-analytics workspace show -g cptdagw -n cptdagw --query customerId -o tsv)
 ~~~
 
+In case of a 200 OK you will receive the http response header "x-appgw-trace-id". 
 Use the node.js helper script to format the http header "x-appgw-trace-id" value into GUID format.
 
 ~~~
@@ -184,26 +112,101 @@ az monitor log-analytics query -w $law --analytics-query 'AzureDiagnostics | whe
 NOTE:
 If you do not know the transaction ID you can query the log record by url query parameter and client ip.
 
-~~~bash
-az monitor log-analytics query -w $law --analytics-query 'AzureDiagnostics | where ResourceId contains "APPLICATIONGATEWAY" | where clientIP_s == "10.0.2.4" | where requestQuery_s == "cpt=evil2"' --query [].transactionId_g
+~~~ text
+vm=$(az vm list -g $rg --query [].name -o tsv)
+az network nic show -g $rg -n $vm --query ipConfigurations[0].privateIpAddress -o tsv
+~~~
+
+~~~ text
+az monitor log-analytics query -w $law --analytics-query 'AzureDiagnostics | where ResourceId contains "APPLICATIONGATEWAY" | where clientIP_s == "10.0.0.4" | where requestQuery_s == "cpt=evil"' --query [].transactionId_g -o tsv
 ~~~
 
 Get web application firewall log record by transaction Id.
 
 ~~~bash
-az monitor log-analytics query -w $law --analytics-query 'AzureDiagnostics | where transactionId_g =="96fd8d5a-998a-1b92-de37-e6be90e8673e"' --query '[].{}
+az monitor log-analytics query -w $law --analytics-query 'AzureDiagnostics | where transactionId_g =="9e05cd21-e951-c1e3-ae2f-8a980c37772c"'
 ~~~
 
-Get web application firewall log record by url
+
+
+## Misc
+
+### Create certificates 
+
+IMPORTANT: This step is optional and if done you will need to update certain files. Instead you can just use the certificates already created under the folder openssl.
+
+Certificates will be created with the help of openssl and a corresponding config file (certificate.cnf).
 
 ~~~bash
-az monitor log-analytics query -w $law --analytics-query 'AzureDiagnostics 
-| where ResourceProvider == "MICROSOFT.NETWORK" and Category == "ApplicationGatewayFirewallLog" | where clientIp_s == "10.0.2.4" | where requestUri_s == "/cptdagw/test.txt?cpt=evil2"'
+./create.certificates.sh
 ~~~
 
-## Client Certificates
+### Get application gateway public ip
 
-TBD
+NOTE:
+You can get the public IP as follow
+
+~~~bash
+az network public-ip show -n ${prefix}agw -g $rg --query ipAddress -o tsv
+~~~
+
+### Bastion Client tunnel feature
+
+NOTE: At the time of writing this article bastion client is not supported under WSL :(.
+In case thing´s did change meanwhile you can try the following command to ssh from your bash shell via Azure Bastion into the vm.
+
+~~~ text
+bastion=$(az network bastion list -g $prefix --query [].name -o tsv)
+vm=${prefix}lin
+vmid=$(az vm show -n $vm -g $rg --query id -o tsv)
+az network bastion ssh -n $bastion -g $rg --target-resource-id $vmid --auth-type ssh-key --username chpinoto --ssh-key ssh/chpinoto.key
+~~~
+
+### Test client certificate locally 
+
+~~~ text
+node server.js
+~~~
+
+Open a new shell.
+
+~~~ text
+curl -v -k --tlsv1.2 --cert openssl/alice.crt --key openssl/alice.key https://127.0.0.1/
+~~~
+
+Get more details of the tls handshake via openssl.
+
+~~~ text
+echo quit | openssl s_client -showcerts -connect 127.0.0.1:443
+~~~
+
+### Retrieve certificate details openssl
+
+~~~ text
+openssl x509 -in openssl/alice.cer -noout -subject -issuer
+openssl x509 -in openssl/alice.cer -subject -issuer
+openssl x509 --help
+~~~
+
+Extract the certificate from server
+
+~~~ text
+echo quit | openssl s_client -showcerts -servername localhost -connect localhost:443 > testcacert.pem
+~~~
+
+Show certification chain
+~~~ text
+echo quit | openssl s_client -connect localhost:443 -showcerts | grep "^ "
+~~~
+
+
+az group delete -n $rg -y
+
+
+### Links
+
+- https://github.com/julie-ng/nodejs-certificate-auth
+
 
 ## Create Ed25519 Server Ceritifcate with openssl
 
@@ -219,3 +222,26 @@ X25519 is a key exchange - which is supported by browsers. Ed25519 is instead a 
 X25519 (ECDH Key Exchange) with ED25519 (Digital signatures).
 
 TBD
+
+
+## Git misc
+
+~~~ text
+git tag //list local repo tags
+git ls-remote --tags origin //list remote repo tags
+git fetch --all --tags // get all remote tags into my local repo
+git log --oneline --decorate // List commits
+git log --pretty=oneline //list commits
+git tag -a v1 f52ab5f //tag my last commit
+
+git checkout v1
+git switch - //switch back to current version
+git push origin --tags //Push all my local tags
+git push origin <tagname> //Push a specific tag
+git commit -m"not transient"
+git tag v1
+git push origin v1
+git tag -l
+git fetch --tags
+git clone -b <git-tagname> <repository-url> 
+~~~

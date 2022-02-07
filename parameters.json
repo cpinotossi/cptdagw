@@ -3,6 +3,7 @@
     "location":"eastus",
     "cnCertificateFrontend":"test.cptdagw.org",
     "cnCABackend":"cptdagw.org",
-    "myObjectId": "MY-OBJECT-ID",
-    "username":"chpinoto"
+    "username":"chpinoto",
+    "password":"demo!pass123",
+    "certpassword":"test123!"
 }

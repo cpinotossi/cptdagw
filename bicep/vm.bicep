@@ -5,7 +5,8 @@ param location string = 'eastus'
 param password string = 'dummy'
 param username string = 'dummy'
 param myObjectId string = 'dummy'
-
+param postfix string
+param privateip string
 
 
 resource vnet 'Microsoft.Network/virtualNetworks@2020-08-01' existing = {
@@ -13,14 +14,15 @@ resource vnet 'Microsoft.Network/virtualNetworks@2020-08-01' existing = {
 }
 
 resource nic 'Microsoft.Network/networkInterfaces@2020-08-01' = {
-  name: '${prefix}nic'
+  name: '${prefix}${postfix}'
   location: location
   properties: {
     ipConfigurations: [
       {
-        name: '${prefix}ipconfig'
+        name: '${prefix}${postfix}'
         properties: {
-          privateIPAddress: '10.0.0.4'
+          privateIPAddress:privateip
+          // privateIPAddress: '10.0.0.4'
           privateIPAllocationMethod: 'Static'
           subnet: {
             id: '${vnet.id}/subnets/${prefix}'
@@ -47,7 +49,7 @@ resource sshkey 'Microsoft.Compute/sshPublicKeys@2021-07-01' = {
 }
 
 resource vm 'Microsoft.Compute/virtualMachines@2019-07-01' = {
-  name: prefix
+  name: '${prefix}${postfix}'
   location: location
   identity: {
     type: 'SystemAssigned'
@@ -58,7 +60,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2019-07-01' = {
     }
     storageProfile: {
       osDisk: {
-        name: '${prefix}'
+        name: '${prefix}${postfix}'
         createOption: 'FromImage'
         managedDisk: {
           storageAccountType: 'Standard_LRS'
@@ -72,14 +74,17 @@ resource vm 'Microsoft.Compute/virtualMachines@2019-07-01' = {
       }
     }
     osProfile: {
-      computerName: prefix
+      computerName: '${prefix}${postfix}'
       adminUsername: username
       adminPassword: password
       customData: loadFileAsBase64('vm.yaml')
       linuxConfiguration:{
         ssh:{
           publicKeys: [
-            sshkey
+            {
+              path:'/home/chpinoto/.ssh/authorized_keys'
+              keyData: sshkey.properties.publicKey
+            }
           ]
         }
       }

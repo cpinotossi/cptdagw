@@ -78,25 +78,42 @@ CN = cptdagw.org CA
 Without the query parameter cpt=evil you should receive an 200 OK.
 
 ~~~ text
- curl -H"host: test.cptdagw.org" http://10.0.2.4/
+curl -H"host: test.cptdagw.org" http://10.0.2.4/
 ~~~
 
-Blocked by WAF
+Blocked by WAF, you should receive an 403 Forbidden because of the query parameter cpt=evil.
 
 ~~~ text
 curl -v -H"host: test.cptdagw.org" "http://10.0.2.4/?cpt=evil"
 ~~~
 
-You should receive HTTP 403 Forbidden.
-
-
 Get the log analytics workspace id.
+
+Get the VM ip.
+
+~~~ text
+vm=$(az vm list -g $rg --query [].name -o tsv)
+az network nic show -g $rg -n $vm --query ipConfigurations[0].privateIpAddress -o tsv
+~~~
+
+In our case the ip has been "10.0.0.4", in case you got a differnt one, replace it inside the following command.
 
 ~~~bash
 law=$(az monitor log-analytics workspace show -g cptdagw -n cptdagw --query customerId -o tsv)
+az monitor log-analytics query -w $law --analytics-query 'AzureDiagnostics | where ResourceId contains "APPLICATIONGATEWAY" | where clientIP_s == "10.0.0.4" | where requestQuery_s == "cpt=evil"' --query [].transactionId_g -o tsv
 ~~~
 
-In case of a 200 OK you will receive the http response header "x-appgw-trace-id". 
+
+Get web application firewall log record by transaction Id.
+In our case we received the transaction id c60bf05a-6102-5a74-a91a-699e00fb954e.
+You will get another one which you need to replace on the next command.
+
+~~~bash
+az monitor log-analytics query -w $law --analytics-query 'AzureDiagnostics | where transactionId_g =="c60bf05a-6102-5a74-a91a-699e00fb954e"'
+~~~
+
+
+In case the WAF did not block your request you will recieve a 200 OK. Part of the response will be the http response header "x-appgw-trace-id". 
 Use the node.js helper script to format the http header "x-appgw-trace-id" value into GUID format.
 
 ~~~
@@ -108,26 +125,6 @@ Get application gateway log record by transaction id.
 ~~~bash
 az monitor log-analytics query -w $law --analytics-query 'AzureDiagnostics | where transactionId_g=="fbb1e0f8-4024-3e44-0e74-de29ea5581bc"'
 ~~~
-
-NOTE:
-If you do not know the transaction ID you can query the log record by url query parameter and client ip.
-
-~~~ text
-vm=$(az vm list -g $rg --query [].name -o tsv)
-az network nic show -g $rg -n $vm --query ipConfigurations[0].privateIpAddress -o tsv
-~~~
-
-~~~ text
-az monitor log-analytics query -w $law --analytics-query 'AzureDiagnostics | where ResourceId contains "APPLICATIONGATEWAY" | where clientIP_s == "10.0.0.4" | where requestQuery_s == "cpt=evil"' --query [].transactionId_g -o tsv
-~~~
-
-Get web application firewall log record by transaction Id.
-
-~~~bash
-az monitor log-analytics query -w $law --analytics-query 'AzureDiagnostics | where transactionId_g =="9e05cd21-e951-c1e3-ae2f-8a980c37772c"'
-~~~
-
-
 
 ## Misc
 

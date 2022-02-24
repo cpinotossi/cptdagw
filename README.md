@@ -229,11 +229,11 @@ git ls-remote --tags origin //list remote repo tags
 git fetch --all --tags // get all remote tags into my local repo
 git log --oneline --decorate // List commits
 git log --pretty=oneline //list commits
-git tag -a v1 f52ab5f //tag my last commit
+git tag -a v2 b20e80a //tag my last commit
 
 git checkout v1
 git switch - //switch back to current version
-git push origin --tags //Push all my local tags
+co //Push all my local tags
 git push origin <tagname> //Push a specific tag
 git commit -m"not transient"
 git tag v1

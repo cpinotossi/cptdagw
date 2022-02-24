@@ -1,11 +1,12 @@
 #!/usr/bin/env nodejs
+
 const https = require('https');
 const http = require('http');
 const fs = require('fs');
 const url = require('url');
 
 let args=process.argv;
-let color=args[2];
+let color= args[2]?args[2]:'red';
 
 // Object which will be printed on server response
 let socketDetails = {
@@ -32,6 +33,8 @@ const optionsSSL = {
 // Create https server
 var serverSSL = https.createServer(optionsSSL);
 serverSSL.on('request',(req,res)=>{
+    //Create some cpu load
+    let f = (url.parse(req.url,true).query.f)?parseInt(url.parse(req.url,true).query.f):0;
     socketDetails.ladd = req.socket.localAddress;
     socketDetails.lport = req.socket.localPort;
     socketDetails.radd = req.socket.remoteAddress;
@@ -54,15 +57,27 @@ serverSSL.listen(portSSL,'0.0.0.0',()=>{
 const port = 80
 var server = http.createServer();
 server.on('request',(req,res)=>{
+    //Create some cpu load
+    let f = (url.parse(req.url,true).query.f)?parseInt(url.parse(req.url,true).query.f):0;
     socketDetails.ladd = req.socket.localAddress;
     socketDetails.lport = req.socket.localPort;
     socketDetails.radd = req.socket.remoteAddress;
     socketDetails.rport = req.socket.remotePort;
+    res.write(`<body bgcolor="${color}">\n`);
     res.write(`${JSON.stringify(req.headers, null, '\t')}\n`);
     res.write(`${JSON.stringify(socketDetails, null, '\t')}\n`);   
+    res.write(`</body>\n`);
     res.end();
 });
 
 server.listen(port,'0.0.0.0',()=>{
     console.log(`Server waiting on port ${port} for you`)
 })
+
+function fubi(num){
+    if(num<=1){
+        return num;
+    }else{
+        return fubi(num-1)+fubi(num-2);
+    }
+}

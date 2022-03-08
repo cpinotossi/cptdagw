@@ -7,8 +7,8 @@ param cnCertificateFrontend string = 'dummy'
 param cnCABackend string = 'dummy'
 
 // var parameters = json(loadTextContent('../parameters.json'))
-var servercertificatefrontend = loadFileAsBase64('../openssl/srv.pfx')
-var cacertificatebackend = loadFileAsBase64('../openssl/ca.crt')
+var servercertificatefrontend = loadFileAsBase64('../openssl/srv.pfx') //CN = test.cptdagw.org
+var cacertificatebackend = loadFileAsBase64('../openssl/ca.crt') //CN = cptdagw.org
 var clientcertificatefrontend = loadFileAsBase64('../openssl/ca.crt')
 
 resource vnet 'Microsoft.Network/virtualNetworks@2021-03-01' existing = {
@@ -103,18 +103,18 @@ resource agw 'Microsoft.Network/applicationGateways@2021-03-01' = {
     }
     sslCertificates: [
       {
-        name: cnCertificateFrontend
+        name: cnCertificateFrontend // test.cptdagw.org
         properties:{
-          data: servercertificatefrontend
+          data: servercertificatefrontend //PEM: CN = test.cptdagw.org
           password: certpassword
         }
       }
     ]
     trustedRootCertificates: [
       {
-        name:cnCABackend
+        name:cnCABackend //cptdagw.org
         properties: {
-          data: cacertificatebackend
+          data: cacertificatebackend // PEM: CN = cptdagw.org
         }
       }
     ]
@@ -204,8 +204,8 @@ resource agw 'Microsoft.Network/applicationGateways@2021-03-01' = {
             id: '${resourceId('Microsoft.Network/applicationGateways', prefix)}/sslProfiles/${prefix}'
           }
           hostNames: [
-            cnCertificateFrontend
-            cnCABackend
+            cnCertificateFrontend // test.cptdagw.org
+            cnCABackend // cptdagw.org just for testing multi hostname support via SNI.
           ]
           firewallPolicy:{
             id:fwp1.id

@@ -14,10 +14,10 @@ Define certain variables we will need
 ~~~ text
 prefix=cptdagw
 rg=${prefix}
-myobjectid=$(az ad user list --query '[?displayName==`chpinoto`].objectId' -o tsv)
+myobjectid=$(az ad user list --query '[?displayName==`ga`].objectId' -o tsv)
 myip=$(curl ifconfig.io)
 az group create -n $rg -l eastus
-az deployment group create -n create-vnet -g $rg --template-file bicep/deploy.bicep -p myobjectid=$myobjectid myip=$myip
+az deployment group create -n create-vnet -g $rg --template-file bicep/deploy.bicep -p myobjectid=$myobjectid myip=$myip prefix=$prefix
 ~~~
 
 Verify if backend is working.
@@ -34,9 +34,26 @@ Get the AGW private IP.
 az network application-gateway show -n $prefix -g $rg --query frontendIpConfigurations[].privateIpAddress -o tsv
 ~~~
 
-Log into the vm via bastion and send a request via curl with a valid Client Certificate.
 
-~~~ text
+#### SSH into grafana VM via azure bastion client
+
+> IMPORTANT: The following commands need to executed on powershell.
+
+~~~ pwsh
+$prefix="cptdagw"
+$vmidlin=az vm show -g $prefix -n ${prefix}lin --query id -o tsv
+az network bastion ssh -n ${prefix}bastion -g $prefix --target-resource-id $vmidlin --auth-type "AAD"
+~~~
+
+Or use ssh without AAD
+
+~~~ pwsh
+az network bastion ssh -n ${prefix}bastion -g $prefix --target-resource-id $vmidlin --auth-type ssh-key --username chpinoto --ssh-key ssh/chpinoto.key
+~~~
+
+Inside the vm send a request to the private IP of the agw via curl with a valid Client Certificate.
+
+~~~ bash
 cd /
 curl -v -k --cert openssl/alice.crt --key openssl/alice.key https://test.cptdagw.org/ --resolve test.cptdagw.org:443:10.0.2.4
 ~~~
@@ -59,9 +76,20 @@ You should receive an 400 Bad Request.
 
 ~~~ text
 HTTP/1.1 400 Bad Request
+
+<html>
+<head><title>400 No required SSL certificate was sent</title></head>
+<body>
+<center><h1>400 Bad Request</h1></center>
+<center>No required SSL certificate was sent</center>
+<hr><center>Microsoft-Azure-Application-Gateway/v2</center>
+</body>
+</html>
 ~~~
 
-~~~ text
+See more details of the ssl handshake by using openssl.
+
+~~~ bash
 echo quit | openssl s_client -showcerts -connect 10.0.2.4:443 -servername test.cptdagw.org:443
 ~~~
 
@@ -147,18 +175,6 @@ You can get the public IP as follow
 az network public-ip show -n ${prefix}agw -g $rg --query ipAddress -o tsv
 ~~~
 
-### Bastion Client tunnel feature
-
-NOTE: At the time of writing this article bastion client is not supported under WSL :(.
-In case thing´s did change meanwhile you can try the following command to ssh from your bash shell via Azure Bastion into the vm.
-
-~~~ text
-bastion=$(az network bastion list -g $prefix --query [].name -o tsv)
-vm=${prefix}lin
-vmid=$(az vm show -n $vm -g $rg --query id -o tsv)
-az network bastion ssh -n $bastion -g $rg --target-resource-id $vmid --auth-type ssh-key --username chpinoto --ssh-key ssh/chpinoto.key
-~~~
-
 ### Test client certificate locally 
 
 ~~~ text
@@ -180,8 +196,11 @@ echo quit | openssl s_client -showcerts -connect 127.0.0.1:443
 ### Retrieve certificate details openssl
 
 ~~~ text
-openssl x509 -in openssl/alice.cer -noout -subject -issuer
-openssl x509 -in openssl/alice.cer -subject -issuer
+openssl x509 -in openssl/alice.crt -noout -subject -issuer
+openssl x509 -in openssl/alice.crt -subject -issuer
+openssl x509 -in openssl/alice.crt -text
+openssl x509 -in openssl/ca.crt -text
+openssl x509 -in openssl/srv.crt -noout -text
 openssl x509 --help
 ~~~
 

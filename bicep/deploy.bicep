@@ -4,11 +4,12 @@ var parameters = json(loadTextContent('../parameters.json'))
 var location = resourceGroup().location
 param myobjectid string
 param myip string
+param prefix string
 
 module vnetModule 'vnet.bicep' = {
   name: 'vnetDeploy'
   params: {
-    prefix: parameters.prefix
+    prefix: prefix
     location: location
   }
 }
@@ -16,7 +17,7 @@ module vnetModule 'vnet.bicep' = {
 module vmModule 'vm.bicep' = {
   name: 'vmDeploy'
   params: {
-    prefix: parameters.prefix
+    prefix: prefix
     location: location
     username: parameters.username
     password: parameters.password
@@ -32,7 +33,7 @@ module vmModule 'vm.bicep' = {
 module sabModule 'sab.bicep' = {
   name: 'sabDeploy'
   params: {
-    prefix: parameters.prefix
+    prefix: prefix
     location: location
     myip: myip
     myObjectId: myobjectid
@@ -45,7 +46,7 @@ module sabModule 'sab.bicep' = {
 module agwModule 'agw.bicep' = {
   name: 'agwDeploy'
   params: {
-    prefix: parameters.prefix
+    prefix: prefix
     location: location
     cnCertificateFrontend: parameters.cnCertificateFrontend
     certpassword: parameters.certpassword
@@ -59,7 +60,7 @@ module agwModule 'agw.bicep' = {
 module lawModule 'law.bicep' = {
   name: 'lawDeploy'
   params:{
-    prefix: parameters.prefix
+    prefix: prefix
     location: location
   }
   dependsOn:[

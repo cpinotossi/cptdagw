@@ -10,7 +10,11 @@ Create application gateway with
 
 ### Deploy 
 
+TODO: Fix the error Message: Data sink '/subscriptions/000-00000-0000-0000/resourceGroups/cptdagw/providers/Microsoft.OperationalInsights/workspaces/cptdagw' is already used in diagnostic setting 'diasettings' for category 'allLogs'. Data sinks can't be reused in different settings on the same category for the same resource.'
+NOTE: Deployment still works.
+
 Define certain variables we will need
+
 ~~~ bash
 prefix=cptdagw
 location=eastus
@@ -188,13 +192,16 @@ TBD
 
 ~~~ text
 git status
+git add *
+git commit -m"Add client cert pem in forward header"
+git push origin master
+
 git tag //list local repo tags
 git ls-remote --tags origin //list remote repo tags
 git fetch --all --tags // get all remote tags into my local repo
 git log --oneline --decorate // List commits
 git log --pretty=oneline //list commits
 git tag -a v2 b20e80a //tag my last commit
-
 git checkout v1
 git switch - //switch back to current version
 co //Push all my local tags

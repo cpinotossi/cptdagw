@@ -1,4 +1,4 @@
-targetScope='resourceGroup'
+targetScope = 'resourceGroup'
 
 param prefix string = 'cptd'
 param location string = 'eastus'
@@ -21,11 +21,11 @@ resource sab 'Microsoft.Storage/storageAccounts@2021-06-01' existing = {
 
 resource fwp1 'Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicies@2021-03-01' = {
   name: prefix
-  location:location
+  location: location
   properties: {
     policySettings: {
-      state:'Enabled'
-      mode:'Prevention'
+      state: 'Enabled'
+      mode: 'Prevention'
       requestBodyCheck: false
       maxRequestBodySizeInKb: 128
     }
@@ -38,24 +38,24 @@ resource fwp1 'Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicie
         }
       ]
     }
-    customRules:[
+    customRules: [
       {
-        name:'customrule1'
-        priority:5
-        ruleType:'MatchRule'
-        action:'Block'
-        matchConditions:[
+        name: 'customrule1'
+        priority: 5
+        ruleType: 'MatchRule'
+        action: 'Block'
+        matchConditions: [
           {
-            matchVariables:[
+            matchVariables: [
               {
-                variableName:'QueryString'
+                variableName: 'QueryString'
               }
             ]
-            operator:'Contains'
-            transforms:[
+            operator: 'Contains'
+            transforms: [
               'Lowercase'
             ]
-            matchValues:[
+            matchValues: [
               'evil'
             ]
           }
@@ -68,15 +68,15 @@ resource fwp1 'Microsoft.Network/ApplicationGatewayWebApplicationFirewallPolicie
 resource pubip 'Microsoft.Network/publicIPAddresses@2021-03-01' = {
   name: '${prefix}agw'
   location: location
-  sku:{
-    tier:'Regional'
-    name:'Standard'
+  sku: {
+    tier: 'Regional'
+    name: 'Standard'
   }
   properties: {
     publicIPAddressVersion: 'IPv4'
     publicIPAllocationMethod: 'Static'
-    dnsSettings:{
-      domainNameLabel:prefix
+    dnsSettings: {
+      domainNameLabel: prefix
     }
   }
 }
@@ -90,21 +90,21 @@ resource agw 'Microsoft.Network/applicationGateways@2021-03-01' = {
   name: prefix
   location: location
   identity: {
-    type:'UserAssigned'
-    userAssignedIdentities:{
-      '${umid.id}':{}
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${umid.id}': {}
     }
   }
-  properties:{
-    sku:{
-      capacity:1
-      tier:'WAF_v2'
+  properties: {
+    sku: {
+      capacity: 1
+      tier: 'WAF_v2'
       name: 'WAF_v2'
     }
     sslCertificates: [
       {
         name: cnCertificateFrontend // test.cptdagw.org
-        properties:{
+        properties: {
           data: servercertificatefrontend //PEM: CN = test.cptdagw.org
           password: certpassword
         }
@@ -112,7 +112,7 @@ resource agw 'Microsoft.Network/applicationGateways@2021-03-01' = {
     ]
     trustedRootCertificates: [
       {
-        name:cnCABackend //cptdagw.org
+        name: cnCABackend //cptdagw.org
         properties: {
           data: cacertificatebackend // PEM: CN = cptdagw.org
         }
@@ -120,43 +120,43 @@ resource agw 'Microsoft.Network/applicationGateways@2021-03-01' = {
     ]
     trustedClientCertificates: [
       {
-          name: prefix
-          properties: {
-              data: clientcertificatefrontend
-          }
+        name: prefix
+        properties: {
+          data: clientcertificatefrontend
+        }
       }
     ]
     sslProfiles: [
       {
-          name: prefix
-          properties: {
-              clientAuthConfiguration: {
-                  verifyClientCertIssuerDN: false
-              }
-              trustedClientCertificates: [
-                  {
-                    id:'${resourceId('Microsoft.Network/applicationGateways', prefix)}/trustedClientCertificates/${prefix}'
-                  }
-              ]
+        name: prefix
+        properties: {
+          clientAuthConfiguration: {
+            verifyClientCertIssuerDN: false
           }
+          trustedClientCertificates: [
+            {
+              id: '${resourceId('Microsoft.Network/applicationGateways', prefix)}/trustedClientCertificates/${prefix}'
+            }
+          ]
+        }
       }
-  ]
-    gatewayIPConfigurations:[
+    ]
+    gatewayIPConfigurations: [
       {
-        name:prefix
-        properties:{
-          subnet:{
+        name: prefix
+        properties: {
+          subnet: {
             id: '${vnet.id}/subnets/${prefix}agw'
           }
         }
       }
     ]
-    frontendIPConfigurations:[
+    frontendIPConfigurations: [
       {
-        name:'frontendIPConfigurationPublic'
-        properties:{
-          publicIPAddress:{
-            id:pubip.id
+        name: 'frontendIPConfigurationPublic'
+        properties: {
+          publicIPAddress: {
+            id: pubip.id
           }
         }
       }
@@ -171,7 +171,7 @@ resource agw 'Microsoft.Network/applicationGateways@2021-03-01' = {
         }
       }
     ]
-    frontendPorts:[
+    frontendPorts: [
       {
         name: 'frontendportTls'
         properties: {
@@ -185,77 +185,77 @@ resource agw 'Microsoft.Network/applicationGateways@2021-03-01' = {
         }
       }
     ]
-    httpListeners:[
+    httpListeners: [
       {
-        name:'httplistenerTls'
-        properties:{
-          protocol:'Https'
-          requireServerNameIndication:true
-          frontendIPConfiguration:{
-            id:'${resourceId('Microsoft.Network/applicationGateways', prefix)}/frontendIPConfigurations/frontendIPConfigurationPrivate'
+        name: 'httplistenerTls'
+        properties: {
+          protocol: 'Https'
+          requireServerNameIndication: true
+          frontendIPConfiguration: {
+            id: '${resourceId('Microsoft.Network/applicationGateways', prefix)}/frontendIPConfigurations/frontendIPConfigurationPrivate'
           }
-          frontendPort:{
-            id:'${resourceId('Microsoft.Network/applicationGateways', prefix)}/frontendPorts/frontendportTls'
+          frontendPort: {
+            id: '${resourceId('Microsoft.Network/applicationGateways', prefix)}/frontendPorts/frontendportTls'
           }
           sslCertificate: {
             id: '${resourceId('Microsoft.Network/applicationGateways', prefix)}/sslCertificates/${cnCertificateFrontend}'
           }
-          sslProfile:{
+          sslProfile: {
             id: '${resourceId('Microsoft.Network/applicationGateways', prefix)}/sslProfiles/${prefix}'
           }
           hostNames: [
             cnCertificateFrontend // test.cptdagw.org
             cnCABackend // cptdagw.org just for testing multi hostname support via SNI.
           ]
-          firewallPolicy:{
-            id:fwp1.id
+          firewallPolicy: {
+            id: fwp1.id
           }
         }
       }
       {
-        name:'httplistenerHttp'
-        properties:{
-          protocol:'Http'
-          frontendIPConfiguration:{
-            id:'${resourceId('Microsoft.Network/applicationGateways', prefix)}/frontendIPConfigurations/frontendIPConfigurationPrivate'
+        name: 'httplistenerHttp'
+        properties: {
+          protocol: 'Http'
+          frontendIPConfiguration: {
+            id: '${resourceId('Microsoft.Network/applicationGateways', prefix)}/frontendIPConfigurations/frontendIPConfigurationPrivate'
           }
-          frontendPort:{
-            id:'${resourceId('Microsoft.Network/applicationGateways', prefix)}/frontendPorts/frontendportHttp'
+          frontendPort: {
+            id: '${resourceId('Microsoft.Network/applicationGateways', prefix)}/frontendPorts/frontendportHttp'
           }
           hostNames: [
             cnCertificateFrontend
             cnCABackend
           ]
-          firewallPolicy:{
-            id:fwp1.id
+          firewallPolicy: {
+            id: fwp1.id
           }
         }
       }
     ]
-    backendAddressPools:[
+    backendAddressPools: [
       {
-        name:'backendaddresspool'
-        properties:{
-          backendAddresses:[
+        name: 'backendaddresspool'
+        properties: {
+          backendAddresses: [
             {
-              ipAddress:'10.0.0.4'
+              ipAddress: '10.0.0.4'
             }
           ]
         }
       }
     ]
-    backendHttpSettingsCollection:[
+    backendHttpSettingsCollection: [
       {
-        name:'backendhttpsettingTls'
-        properties:{
-          port:443
-          protocol:'Https'
-          pickHostNameFromBackendAddress:false
-          hostName:cnCertificateFrontend
+        name: 'backendhttpsettingTls'
+        properties: {
+          port: 443
+          protocol: 'Https'
+          pickHostNameFromBackendAddress: false
+          hostName: cnCertificateFrontend
           probe: {
             id: '${resourceId('Microsoft.Network/applicationGateways', prefix)}/probes/healthprobeTls'
           }
-          trustedRootCertificates:[
+          trustedRootCertificates: [
             {
               id: '${resourceId('Microsoft.Network/applicationGateways', prefix)}/trustedRootCertificates/${cnCABackend}'
             }
@@ -263,46 +263,49 @@ resource agw 'Microsoft.Network/applicationGateways@2021-03-01' = {
         }
       }
       {
-        name:'backendhttpsettingHttp'
-        properties:{
-          port:80
-          protocol:'Http'
-          pickHostNameFromBackendAddress:false
-          hostName:cnCertificateFrontend
+        name: 'backendhttpsettingHttp'
+        properties: {
+          port: 80
+          protocol: 'Http'
+          pickHostNameFromBackendAddress: false
+          hostName: cnCertificateFrontend
           probe: {
             id: '${resourceId('Microsoft.Network/applicationGateways', prefix)}/probes/healthprobeHttp'
           }
         }
       }
     ]
-    requestRoutingRules:[
+    requestRoutingRules: [
       {
-        name:'requestroutingruleTls'
-        properties:{
-          ruleType:'Basic'
-          httpListener:{
-            id:'${resourceId('Microsoft.Network/applicationGateways', prefix)}/httpListeners/httplistenerTls'
+        name: 'requestroutingruleTls'
+        properties: {
+          ruleType: 'Basic'
+          httpListener: {
+            id: '${resourceId('Microsoft.Network/applicationGateways', prefix)}/httpListeners/httplistenerTls'
           }
-          backendAddressPool:{
-            id:'${resourceId('Microsoft.Network/applicationGateways', prefix)}/backendAddressPools/backendaddresspool'
+          backendAddressPool: {
+            id: '${resourceId('Microsoft.Network/applicationGateways', prefix)}/backendAddressPools/backendaddresspool'
           }
-          backendHttpSettings:{
-            id:'${resourceId('Microsoft.Network/applicationGateways', prefix)}/backendHttpSettingsCollection/backendhttpSettingTls'
+          backendHttpSettings: {
+            id: '${resourceId('Microsoft.Network/applicationGateways', prefix)}/backendHttpSettingsCollection/backendhttpSettingTls'
+          }
+          rewriteRuleSet: {
+            id: '${resourceId('Microsoft.Network/applicationGateways', prefix)}/rewriteRuleSets/${prefix}'
           }
         }
       }
       {
-        name:'requestroutingruleHttp'
-        properties:{
-          ruleType:'Basic'
-          httpListener:{
-            id:'${resourceId('Microsoft.Network/applicationGateways', prefix)}/httpListeners/httplistenerHttp'
+        name: 'requestroutingruleHttp'
+        properties: {
+          ruleType: 'Basic'
+          httpListener: {
+            id: '${resourceId('Microsoft.Network/applicationGateways', prefix)}/httpListeners/httplistenerHttp'
           }
-          backendAddressPool:{
-            id:'${resourceId('Microsoft.Network/applicationGateways', prefix)}/backendAddressPools/backendaddresspool'
+          backendAddressPool: {
+            id: '${resourceId('Microsoft.Network/applicationGateways', prefix)}/backendAddressPools/backendaddresspool'
           }
-          backendHttpSettings:{
-            id:'${resourceId('Microsoft.Network/applicationGateways', prefix)}/backendHttpSettingsCollection/backendhttpSettingHttp'
+          backendHttpSettings: {
+            id: '${resourceId('Microsoft.Network/applicationGateways', prefix)}/backendHttpSettingsCollection/backendhttpSettingHttp'
           }
         }
       }
@@ -317,7 +320,7 @@ resource agw 'Microsoft.Network/applicationGateways@2021-03-01' = {
           timeout: 30
           unhealthyThreshold: 3
           pickHostNameFromBackendHttpSettings: false
-          host:cnCertificateFrontend
+          host: cnCertificateFrontend
           minServers: 0
           match: {
             statusCodes: [
@@ -335,13 +338,37 @@ resource agw 'Microsoft.Network/applicationGateways@2021-03-01' = {
           timeout: 30
           unhealthyThreshold: 3
           pickHostNameFromBackendHttpSettings: false
-          host:cnCertificateFrontend
+          host: cnCertificateFrontend
           minServers: 0
           match: {
             statusCodes: [
               '200-399'
             ]
           }
+        }
+      }
+    ]
+
+    rewriteRuleSets: [
+      {
+        name: prefix
+        properties: {
+          rewriteRules: [
+            {
+              ruleSequence: 100
+              conditions: []
+              name: '${prefix}clientcert'
+              actionSet: {
+                requestHeaderConfigurations: [
+                  {
+                    headerName: 'X-PEM'
+                    headerValue: '{var_client_certificate}'
+                  }
+                ]
+                responseHeaderConfigurations: []
+              }
+            }
+          ]
         }
       }
     ]

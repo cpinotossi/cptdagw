@@ -11,150 +11,81 @@ Create application gateway with
 ### Deploy 
 
 Define certain variables we will need
-~~~ text
+~~~ bash
 prefix=cptdagw
-rg=${prefix}
-myobjectid=$(az ad user list --query '[?displayName==`ga`].objectId' -o tsv)
+location=eastus
+myobjectid=$(az ad user list --query '[?displayName==`ga`].id' -o tsv)
 myip=$(curl ifconfig.io)
-az group create -n $rg -l eastus
-az deployment group create -n create-vnet -g $rg --template-file bicep/deploy.bicep -p myobjectid=$myobjectid myip=$myip prefix=$prefix
+az group create -n $prefix -l $location
+az deployment group create -n create-vnet -g $prefix --template-file bicep/deploy.bicep -p myobjectid=$myobjectid myip=$myip prefix=$prefix
 ~~~
 
 Verify if backend is working.
 
-~~~ text
-az network application-gateway show-backend-health -n $prefix -g $rg --query backendAddressPools[].backendHttpSettingsCollection[].servers[]
+~~~ bash
+az network application-gateway show-backend-health -n $prefix -g $prefix --query backendAddressPools[].backendHttpSettingsCollection[].servers[]
 ~~~
+
+Outcome:
+We expect two entries one for our http and one for our tls backend (both via the same IP).
+
 
 ### Test Client Certificates
 
 Get the AGW private IP.
 
 ~~~ text
-az network application-gateway show -n $prefix -g $rg --query frontendIpConfigurations[].privateIpAddress -o tsv
+az network application-gateway show -n $prefix -g $prefix --query frontendIpConfigurations[].privateIpAddress -o tsv
 ~~~
 
-
-#### SSH into grafana VM via azure bastion client
-
-> IMPORTANT: The following commands need to executed on powershell.
-
-~~~ pwsh
-$prefix="cptdagw"
-$vmidlin=az vm show -g $prefix -n ${prefix}lin --query id -o tsv
-az network bastion ssh -n ${prefix}bastion -g $prefix --target-resource-id $vmidlin --auth-type "AAD"
+Output
+~~~ text
+10.0.2.4
 ~~~
 
-Or use ssh without AAD
-
-~~~ pwsh
-az network bastion ssh -n ${prefix}bastion -g $prefix --target-resource-id $vmidlin --auth-type ssh-key --username chpinoto --ssh-key ssh/chpinoto.key
-~~~
-
-Inside the vm send a request to the private IP of the agw via curl with a valid Client Certificate.
+Test from azure vm
 
 ~~~ bash
-cd /
-curl -v -k --cert openssl/alice.crt --key openssl/alice.key https://test.cptdagw.org/ --resolve test.cptdagw.org:443:10.0.2.4
+vmlinid=$(az vm show -g $prefix -n ${prefix}lin --query id -o tsv)
+az network bastion ssh -n ${prefix}bastion -g $prefix --target-resource-id $vmlinid --auth-type "AAD" # login with bastion
+cd / # change directory 
+# NOTE: We need the curl flag '--resolve' because of [sni](http://www.sigexec.com/posts/curl-and-the-tls-sni-extension/). 
+curl -v -k --cert openssl/alice.crt --key openssl/alice.key https://test.cptdagw.org/ --resolve test.cptdagw.org:443:10.0.2.4 # expect 200 OK
+# Send request without Client Certificate.
+curl -v -k --tlsv1.2 https://test.cptdagw.org/ --resolve test.cptdagw.org:443:10.0.2.4 # expect 400 bad request
+# See more details of the ssl handshake by using openssl.
+echo quit | openssl s_client -showcerts -connect 10.0.2.4:443 -servername test.cptdagw.org:443 # look for Acceptable client certificate CA names
+# Test WAF
+curl -H"host: test.cptdagw.org" http://10.0.2.4/ # expect 200 OK
+curl -v -H"host: test.cptdagw.org" "http://10.0.2.4/?cpt=evil" # blocked by WAF 403 Forbidden.
+logout # logout from the current linux vm.
 ~~~
 
-> NOTE: We need the curl flag '--resolve' because of [sni](http://www.sigexec.com/posts/curl-and-the-tls-sni-extension/). 
-
-Output should be HTTP 200 OK.
-
-~~~ text
-HTTP/1.1 200 OK
-~~~
-
-Send request without Client Certificate.
-
-~~~ text
-curl -v -k --tlsv1.2 https://test.cptdagw.org/ --resolve test.cptdagw.org:443:10.0.2.4
-~~~
-
-You should receive an 400 Bad Request.
-
-~~~ text
-HTTP/1.1 400 Bad Request
-
-<html>
-<head><title>400 No required SSL certificate was sent</title></head>
-<body>
-<center><h1>400 Bad Request</h1></center>
-<center>No required SSL certificate was sent</center>
-<hr><center>Microsoft-Azure-Application-Gateway/v2</center>
-</body>
-</html>
-~~~
-
-See more details of the ssl handshake by using openssl.
+### Retrieve Logs
 
 ~~~ bash
-echo quit | openssl s_client -showcerts -connect 10.0.2.4:443 -servername test.cptdagw.org:443
+vm=$(az vm list -g $prefix --query [].name -o tsv) # vm name
+vmip=$(az network nic show -g $prefix -n $vm --query ipConfigurations[0].privateIpAddress -o tsv) # vm ip
+law=$(az monitor log-analytics workspace show -g $prefix -n $prefix --query customerId -o tsv)
+waftransid=$(az monitor log-analytics query -w $law --analytics-query 'AzureDiagnostics | where ResourceId contains "APPLICATIONGATEWAY" | where clientIP_s == "'${vmip}'" | where requestQuery_s == "cpt=evil"' --query [].transactionId_g -o tsv)
+az monitor log-analytics query -w $law --analytics-query 'AzureDiagnostics | where transactionId_g =="'${waftransid}'"'
 ~~~
-
-There you can see which client certificate CAs our server supports:
-
-~~~ text
----
-Acceptable client certificate CA names
-CN = cptdagw.org CA
-~~~
-
-### Test WAF
-
-Without the query parameter cpt=evil you should receive an 200 OK.
-
-~~~ text
-curl -H"host: test.cptdagw.org" http://10.0.2.4/
-~~~
-
-Blocked by WAF, you should receive an 403 Forbidden because of the query parameter cpt=evil.
-
-~~~ text
-curl -v -H"host: test.cptdagw.org" "http://10.0.2.4/?cpt=evil"
-~~~
-
-Get the log analytics workspace id.
-
-Get the VM ip.
-
-~~~ text
-vm=$(az vm list -g $rg --query [].name -o tsv)
-az network nic show -g $rg -n $vm --query ipConfigurations[0].privateIpAddress -o tsv
-~~~
-
-In our case the ip has been "10.0.0.4", in case you got a differnt one, replace it inside the following command.
-
-~~~bash
-law=$(az monitor log-analytics workspace show -g cptdagw -n cptdagw --query customerId -o tsv)
-az monitor log-analytics query -w $law --analytics-query 'AzureDiagnostics | where ResourceId contains "APPLICATIONGATEWAY" | where clientIP_s == "10.0.0.4" | where requestQuery_s == "cpt=evil"' --query [].transactionId_g -o tsv
-~~~
-
 
 Get web application firewall log record by transaction Id.
 In our case we received the transaction id c60bf05a-6102-5a74-a91a-699e00fb954e.
 You will get another one which you need to replace on the next command.
 
-~~~bash
-az monitor log-analytics query -w $law --analytics-query 'AzureDiagnostics | where transactionId_g =="c60bf05a-6102-5a74-a91a-699e00fb954e"'
-~~~
-
-
-In case the WAF did not block your request you will recieve a 200 OK. Part of the response will be the http response header "x-appgw-trace-id". 
+NOTE: In case the WAF did not block your request you will recieve a 200 OK. Part of the response will be the http response header "x-appgw-trace-id". 
 Use the node.js helper script to format the http header "x-appgw-trace-id" value into GUID format.
 
-~~~
-node guidformater.js fbb1e0f840243e440e74de29ea5581bc
-~~~
-
-Get application gateway log record by transaction id.
-
-~~~bash
-az monitor log-analytics query -w $law --analytics-query 'AzureDiagnostics | where transactionId_g=="fbb1e0f8-4024-3e44-0e74-de29ea5581bc"'
-~~~
-
 ## Misc
+
+### Access azure VMs
+
+~~~ pwsh
+az network bastion ssh -n ${prefix}bastion -g $prefix --target-resource-id $vmidlin --auth-type ssh-key --username chpinoto --ssh-key ssh/chpinoto.key
+~~~
+
 
 ### Create certificates 
 
@@ -164,6 +95,17 @@ Certificates will be created with the help of openssl and a corresponding config
 
 ~~~bash
 ./create.certificates.sh
+~~~
+
+### Restart application gateway
+
+Based on https://docs.microsoft.com/en-us/powershell/module/az.network/start-azapplicationgateway?view=azps-7.3.0
+
+~~~ pwsh
+$prefix="cptdagw"
+$appgw=Get-AzApplicationGateway -n $prefix -g $prefix
+Stop-AzApplicationGateway -ApplicationGateway $prefix
+Start-AzApplicationGateway -ApplicationGateway $prefix
 ~~~
 
 ### Get application gateway public ip
@@ -191,6 +133,8 @@ Get more details of the tls handshake via openssl.
 
 ~~~ text
 echo quit | openssl s_client -showcerts -connect 127.0.0.1:443
+echo quit | openssl s_client -showcerts -tlsextdebug -connect 193.99.144.85:443 //Heise.de
+openssl s_client -tls1_2 -connect 10.217.0.202:2003 -showcerts
 ~~~
 
 ### Retrieve certificate details openssl
@@ -243,6 +187,7 @@ TBD
 ## Git misc
 
 ~~~ text
+git status
 git tag //list local repo tags
 git ls-remote --tags origin //list remote repo tags
 git fetch --all --tags // get all remote tags into my local repo

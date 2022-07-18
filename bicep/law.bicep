@@ -20,7 +20,7 @@ resource agw 'Microsoft.Network/applicationGateways@2021-03-01' existing = {
 resource diaagw 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
   name: prefix
   properties: {
-    storageAccountId: sab.id
+    // storageAccountId: sab.id // causing conflict during deployment
     workspaceId: law.id
     logs: [
       {

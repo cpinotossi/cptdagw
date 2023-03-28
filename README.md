@@ -1,19 +1,6 @@
 # Application Gateway Demo
 
-## Application Gateway with WAF and self signed Server Certificate at frontend and backend
-
-Create application gateway with
-- self signed server certificate for frontend and backend (will use the same cert for both).
-- waf custom rule (scope httplistener).
-- client certificate support on application gateway.
-
-
-### Deploy 
-
-TODO: ADDSSH Extension installation does not work.
-NOTE: Deployment still works.
-
-Define certain variables we will need
+## Application Gateway with VMSS as backend
 
 ~~~ bash
 prefix=cptdagw
@@ -21,9 +8,6 @@ location=eastus
 myobjectid=$(az ad user list --query '[?displayName==`ga`].id' -o tsv)
 myip=$(curl ifconfig.io)
 az deployment sub create -n $prefix -l $location --template-file deploy.bicep -p myobjectid=$myobjectid myip=$myip prefix=$prefix
-
-# az group create -n $prefix -l $location
-# az deployment group create -n create-vnet -g $prefix --template-file deploy.bicep -p myobjectid=$myobjectid myip=$myip prefix=$prefix
 ~~~
 
 Connect to VM
@@ -53,77 +37,6 @@ az network application-gateway show-backend-health -n $prefix -g $prefix --query
 Outcome:
 We expect two entries one for our http and one for our tls backend (both via the same IP).
 
-
-### Test Client Certificates
-
-Get the AGW private IP.
-
-~~~ text
-az network application-gateway show -n $prefix -g $prefix --query frontendIpConfigurations[].privateIpAddress -o tsv
-~~~
-
-Output
-~~~ text
-10.1.2.4
-~~~
-
-Test from azure vm
-
-~~~ bash
-vmnodejsid=$(az vm show -g $prefix -n ${prefix}nodejs --query id -o tsv)
-az network bastion ssh -n ${prefix}bastion -g $prefix --target-resource-id $vmnodejsid --auth-type "AAD" # login with bastion
-# Test via HTTP
-curl -H"host: test.cptdagw.org" http://10.1.2.4/ # expect 200 OK
-# Test WAF
-curl -v -H"host: test.cptdagw.org" "http://10.1.2.4/?cpt=evil" # blocked by WAF 403 Forbidden.
-# Test SSL
-curl -k -H"host: test.cptdagw.org" https://10.1.2.4/ # expect 400 because client cert is needed.
-cd /cptdjsserver # change directory 
-# NOTE: We need the curl flag '--resolve' because of [sni](http://www.sigexec.com/posts/curl-and-the-tls-sni-extension/). 
-curl -v -k --cert openssl/alice.crt --key openssl/alice.key https://test.cptdagw.org/ --resolve test.cptdagw.org:443:10.1.2.4 # expect 200 OK
-# Send request without Client Certificate.
-curl -v -k --tlsv1.2 https://test.cptdagw.org/ --resolve test.cptdagw.org:443:10.1.2.4 # expect 400 bad request
-# See more details of the ssl handshake by using openssl.
-echo quit | openssl s_client -showcerts -connect 10.1.2.4:443 -servername test.cptdagw.org:443 # look for Acceptable client certificate CA names
-logout # logout from the current linux vm.
-~~~
-
-### Retrieve Logs
-
-~~~ bash
-vmip=$(az network nic show -g $prefix -n ${prefix}nodejs --query ipConfigurations[0].privateIpAddress -o tsv) # vm ip
-law=$(az monitor log-analytics workspace show -g $prefix -n $prefix --query customerId -o tsv)
-waftransid=$(az monitor log-analytics query -w $law --analytics-query 'AzureDiagnostics | where ResourceId contains "APPLICATIONGATEWAY" | where clientIP_s == "'${vmip}'" | where requestQuery_s == "cpt=evil"' --query [].transactionId_g -o tsv)
-az monitor log-analytics query -w $law --analytics-query 'AzureDiagnostics | where transactionId_g =="'${waftransid}'"'
-~~~
-
-Get web application firewall log record by transaction Id.
-In our case we received the transaction id c60bf05a-6102-5a74-a91a-699e00fb954e.
-You will get another one which you need to replace on the next command.
-
-NOTE: In case the WAF did not block your request you will recieve a 200 OK. Part of the response will be the http response header "x-appgw-trace-id". 
-Use the node.js helper script to format the http header "x-appgw-trace-id" value into GUID format.
-
-## Misc
-~~~bash
-az deployment operation group list --resource-group $prefix --name $prefix
-~~~
-### Access azure VMs
-
-~~~ pwsh
-az network bastion ssh -n ${prefix}bastion -g $prefix --target-resource-id $vmidlin --auth-type ssh-key --username chpinoto --ssh-key ssh/chpinoto.key
-~~~
-
-
-### Create certificates 
-
-IMPORTANT: This step is optional and if done you will need to update certain files. Instead you can just use the certificates already created under the folder openssl.
-
-Certificates will be created with the help of openssl and a corresponding config file (certificate.cnf).
-
-~~~bash
-./create.certificates.sh
-~~~
 
 ### Restart application gateway
 
@@ -195,21 +108,6 @@ az group delete -n $rg -y
 
 - https://github.com/julie-ng/nodejs-certificate-auth
 
-
-## Create Ed25519 Server Ceritifcate with openssl
-
-Links:
-- https://security.stackexchange.com/questions/236931/whats-the-deal-with-x25519-support-in-chrome-firefox
-- https://www.keyfactor.com/blog/cipher-suites-explained/
-- https://blog.pinterjann.is/ed25519-certificates.html
-
-X25519, Algorithms designed by Daniel J. Bernstein et al. are currenlty quite popular and were implemented by many applications. X25519 is now the most widely used key exchange mechanism in TLS 1.3 and the curve has been adopted by software packages such as OpenSSH, Signal and many more.
-
-X25519 is a key exchange - which is supported by browsers. Ed25519 is instead a signature algorithm - which is not supported. X25519 and Ed25519 are thus different things which both use Curve25519.
-
-X25519 (ECDH Key Exchange) with ED25519 (Digital signatures).
-
-TBD
 
 
 ### Git

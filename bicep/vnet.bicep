@@ -3,20 +3,27 @@ targetScope='resourceGroup'
 param prefix string = 'cptd'
 param location string = 'eastus'
 
+param ipsettings object = {
+  vnet: '10.0.0.0/16'
+  prefix: '10.0.0.0/24'
+  AzureBastionSubnet: '10.0.1.0/24'
+  agw: '10.0.2.0/24' 
+}
+
 resource vnet 'Microsoft.Network/virtualNetworks@2020-08-01' = {
   name: prefix
   location: location
   properties: {
     addressSpace: {
       addressPrefixes: [
-        '10.0.0.0/16'
+        ipsettings.vnet
       ]
     }
     subnets: [
       {
         name: prefix
         properties: {
-          addressPrefix: '10.0.0.0/24'
+          addressPrefix: ipsettings.prefix
           delegations: []
           privateEndpointNetworkPolicies: 'Enabled'
           privateLinkServiceNetworkPolicies: 'Enabled'
@@ -25,7 +32,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2020-08-01' = {
       {
         name: 'AzureBastionSubnet'
         properties: {
-          addressPrefix: '10.0.1.0/24'
+          addressPrefix: ipsettings.AzureBastionSubnet
           delegations: []
           privateEndpointNetworkPolicies: 'Enabled'
           privateLinkServiceNetworkPolicies: 'Enabled'
@@ -34,7 +41,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2020-08-01' = {
       {
         name: '${prefix}agw'
         properties: {
-          addressPrefix: '10.0.2.0/24'
+          addressPrefix: ipsettings.agw
           delegations: []
           privateEndpointNetworkPolicies: 'Enabled'
           privateLinkServiceNetworkPolicies: 'Enabled'

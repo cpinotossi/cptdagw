@@ -5,6 +5,8 @@ param location string = 'eastus'
 param certpassword string = 'dummy'
 param cnCertificateFrontend string = 'dummy'
 param cnCABackend string = 'dummy'
+param frontendip string
+param backendip string
 
 // var parameters = json(loadTextContent('../parameters.json'))
 var servercertificatefrontend = loadFileAsBase64('../openssl/srv.pfx') //CN = test.cptdagw.org
@@ -163,7 +165,7 @@ resource agw 'Microsoft.Network/applicationGateways@2021-03-01' = {
       {
         name: 'frontendIPConfigurationPrivate'
         properties: {
-          privateIPAddress: '10.0.2.4'
+          privateIPAddress: frontendip
           privateIPAllocationMethod: 'Static'
           subnet: {
             id: '${vnet.id}/subnets/${prefix}agw'
@@ -238,7 +240,7 @@ resource agw 'Microsoft.Network/applicationGateways@2021-03-01' = {
         properties: {
           backendAddresses: [
             {
-              ipAddress: '10.0.0.4'
+              ipAddress: backendip
             }
           ]
         }
@@ -248,7 +250,7 @@ resource agw 'Microsoft.Network/applicationGateways@2021-03-01' = {
       {
         name: 'backendhttpsettingTls'
         properties: {
-          port: 443
+          port: 4040
           protocol: 'Https'
           pickHostNameFromBackendAddress: false
           hostName: cnCertificateFrontend
@@ -265,7 +267,7 @@ resource agw 'Microsoft.Network/applicationGateways@2021-03-01' = {
       {
         name: 'backendhttpsettingHttp'
         properties: {
-          port: 80
+          port: 8080
           protocol: 'Http'
           pickHostNameFromBackendAddress: false
           hostName: cnCertificateFrontend

@@ -69,8 +69,8 @@ resource vm 'Microsoft.Compute/virtualMachines@2022-11-01' = {
       }
       imageReference: {
         publisher: 'Canonical'
-        offer: 'UbuntuServer'
-        sku: '18.04-LTS'
+        offer: '0001-com-ubuntu-minimal-focal'
+        sku: 'minimal-20_04-lts-gen2'
         version: 'latest'
       }
     }
@@ -78,7 +78,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2022-11-01' = {
       computerName: '${prefix}${postfix}'
       adminUsername: username
       adminPassword: password
-      customData: loadFileAsBase64('vm.yaml')
+      customData: loadFileAsBase64('vm.nodejs.yaml')
       linuxConfiguration:{
         ssh:{
           publicKeys: [
@@ -95,7 +95,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2022-11-01' = {
         {
           id: nic.id
           properties:{
-            deleteOption: 'Delete'
+            deleteOption:'Delete'
           }
         }
       ]

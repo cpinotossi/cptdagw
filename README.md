@@ -10,7 +10,7 @@ Create application gateway with
 
 ### Deploy 
 
-TODO: Fix the error Message: Data sink '/subscriptions/000-00000-0000-0000/resourceGroups/cptdagw/providers/Microsoft.OperationalInsights/workspaces/cptdagw' is already used in diagnostic setting 'diasettings' for category 'allLogs'. Data sinks can't be reused in different settings on the same category for the same resource.'
+TODO: ADDSSH Extension installation does not work.
 NOTE: Deployment still works.
 
 Define certain variables we will need
@@ -20,11 +20,31 @@ prefix=cptdagw
 location=eastus
 myobjectid=$(az ad user list --query '[?displayName==`ga`].id' -o tsv)
 myip=$(curl ifconfig.io)
-az group create -n $prefix -l $location
-az deployment group create -n create-vnet -g $prefix --template-file bicep/deploy.bicep -p myobjectid=$myobjectid myip=$myip prefix=$prefix
+az deployment sub create -n $prefix -l $location --template-file deploy.bicep -p myobjectid=$myobjectid myip=$myip prefix=$prefix
+
+# az group create -n $prefix -l $location
+# az deployment group create -n create-vnet -g $prefix --template-file deploy.bicep -p myobjectid=$myobjectid myip=$myip prefix=$prefix
 ~~~
 
-Verify if backend is working.
+Connect to VM
+~~~bash
+vmnodejsid=$(az vm show -g $prefix -n ${prefix}nodejs --query id -o tsv)
+az network bastion ssh -n ${prefix}bastion -g $prefix --target-resource-id $vmnodejsid --auth-type "AAD"
+curl localhost:8080 # local request
+curl -v http://10.1.2.4/ -H"host: test.cptdagw.org" # via AGW
+curl -v -k https://10.1.2.4/ -H"host: test.cptdagw.org" # via AGW
+# NOTE: We need the curl flag '--resolve' because of [sni](http://www.sigexec.com/posts/curl-and-the-tls-sni-extension/). 
+curl -v -k https://test.cptdagw.org/ --resolve test.cptdagw.org:443:10.1.2.4 # expect 200 OK
+curl -v -k --cert openssl/alice.crt --key openssl/alice.key https://test.cptdagw.org/ --resolve test.cptdagw.org:443:10.0.2.4 # expect 200 OK
+sudo -u chpinoto bash # in case you like to act like the local user
+cd /cptdjsserver
+
+sudo ps aux | grep pm2 # look for the root etc entry
+sudo PM2_HOME=/etc/.pm2 pm2 status
+logout
+~~~
+
+Verify if backend is working
 
 ~~~ bash
 az network application-gateway show-backend-health -n $prefix -g $prefix --query backendAddressPools[].backendHttpSettingsCollection[].servers[]
@@ -44,32 +64,34 @@ az network application-gateway show -n $prefix -g $prefix --query frontendIpConf
 
 Output
 ~~~ text
-10.0.2.4
+10.1.2.4
 ~~~
 
 Test from azure vm
 
 ~~~ bash
-vmlinid=$(az vm show -g $prefix -n ${prefix}lin --query id -o tsv)
-az network bastion ssh -n ${prefix}bastion -g $prefix --target-resource-id $vmlinid --auth-type "AAD" # login with bastion
-cd / # change directory 
-# NOTE: We need the curl flag '--resolve' because of [sni](http://www.sigexec.com/posts/curl-and-the-tls-sni-extension/). 
-curl -v -k --cert openssl/alice.crt --key openssl/alice.key https://test.cptdagw.org/ --resolve test.cptdagw.org:443:10.0.2.4 # expect 200 OK
-# Send request without Client Certificate.
-curl -v -k --tlsv1.2 https://test.cptdagw.org/ --resolve test.cptdagw.org:443:10.0.2.4 # expect 400 bad request
-# See more details of the ssl handshake by using openssl.
-echo quit | openssl s_client -showcerts -connect 10.0.2.4:443 -servername test.cptdagw.org:443 # look for Acceptable client certificate CA names
+vmnodejsid=$(az vm show -g $prefix -n ${prefix}nodejs --query id -o tsv)
+az network bastion ssh -n ${prefix}bastion -g $prefix --target-resource-id $vmnodejsid --auth-type "AAD" # login with bastion
+# Test via HTTP
+curl -H"host: test.cptdagw.org" http://10.1.2.4/ # expect 200 OK
 # Test WAF
-curl -H"host: test.cptdagw.org" http://10.0.2.4/ # expect 200 OK
-curl -v -H"host: test.cptdagw.org" "http://10.0.2.4/?cpt=evil" # blocked by WAF 403 Forbidden.
+curl -v -H"host: test.cptdagw.org" "http://10.1.2.4/?cpt=evil" # blocked by WAF 403 Forbidden.
+# Test SSL
+curl -k -H"host: test.cptdagw.org" https://10.1.2.4/ # expect 400 because client cert is needed.
+cd /cptdjsserver # change directory 
+# NOTE: We need the curl flag '--resolve' because of [sni](http://www.sigexec.com/posts/curl-and-the-tls-sni-extension/). 
+curl -v -k --cert openssl/alice.crt --key openssl/alice.key https://test.cptdagw.org/ --resolve test.cptdagw.org:443:10.1.2.4 # expect 200 OK
+# Send request without Client Certificate.
+curl -v -k --tlsv1.2 https://test.cptdagw.org/ --resolve test.cptdagw.org:443:10.1.2.4 # expect 400 bad request
+# See more details of the ssl handshake by using openssl.
+echo quit | openssl s_client -showcerts -connect 10.1.2.4:443 -servername test.cptdagw.org:443 # look for Acceptable client certificate CA names
 logout # logout from the current linux vm.
 ~~~
 
 ### Retrieve Logs
 
 ~~~ bash
-vm=$(az vm list -g $prefix --query [].name -o tsv) # vm name
-vmip=$(az network nic show -g $prefix -n $vm --query ipConfigurations[0].privateIpAddress -o tsv) # vm ip
+vmip=$(az network nic show -g $prefix -n ${prefix}nodejs --query ipConfigurations[0].privateIpAddress -o tsv) # vm ip
 law=$(az monitor log-analytics workspace show -g $prefix -n $prefix --query customerId -o tsv)
 waftransid=$(az monitor log-analytics query -w $law --analytics-query 'AzureDiagnostics | where ResourceId contains "APPLICATIONGATEWAY" | where clientIP_s == "'${vmip}'" | where requestQuery_s == "cpt=evil"' --query [].transactionId_g -o tsv)
 az monitor log-analytics query -w $law --analytics-query 'AzureDiagnostics | where transactionId_g =="'${waftransid}'"'
@@ -83,7 +105,9 @@ NOTE: In case the WAF did not block your request you will recieve a 200 OK. Part
 Use the node.js helper script to format the http header "x-appgw-trace-id" value into GUID format.
 
 ## Misc
-
+~~~bash
+az deployment operation group list --resource-group $prefix --name $prefix
+~~~
 ### Access azure VMs
 
 ~~~ pwsh
@@ -188,7 +212,7 @@ X25519 (ECDH Key Exchange) with ED25519 (Digital signatures).
 TBD
 
 
-## Git misc
+### Git
 
 ~~~ text
 git status

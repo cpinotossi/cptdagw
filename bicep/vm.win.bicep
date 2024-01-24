@@ -1,12 +1,13 @@
 targetScope='resourceGroup'
 
-param prefix string = 'cptd'
-param location string = 'eastus'
-param password string = 'dummy'
-param username string = 'dummy'
-param myObjectId string = 'dummy'
+param prefix string
+param location string
+param password string
+param username string
+param myObjectId string
 param postfix string
 param privateip string
+param customData string = ''
 
 
 resource vnet 'Microsoft.Network/virtualNetworks@2022-09-01' existing = {
@@ -68,9 +69,9 @@ resource vm 'Microsoft.Compute/virtualMachines@2022-11-01' = {
         deleteOption:'Delete'
       }
       imageReference: {
-        publisher: 'Canonical'
-        offer: '0001-com-ubuntu-minimal-focal'
-        sku: 'minimal-20_04-lts-gen2'
+        publisher: 'MicrosoftWindowsDesktop'
+        offer: 'Windows-10'
+        sku: '20h2-pro'
         version: 'latest'
       }
     }
@@ -78,17 +79,18 @@ resource vm 'Microsoft.Compute/virtualMachines@2022-11-01' = {
       computerName: '${prefix}${postfix}'
       adminUsername: username
       adminPassword: password
-      customData: loadFileAsBase64('vm.nodejs.yaml')
-      linuxConfiguration:{
-        ssh:{
-          publicKeys: [
-            {
-              path:'/home/chpinoto/.ssh/authorized_keys'
-              keyData: sshkey.properties.publicKey
-            }
-          ]
-        }
-      }
+      // customData: !empty(customData) ? base64(customData) : null
+      // customData: loadFileAsBase64('vm.nodejs.yaml')
+      // linuxConfiguration:{
+      //   ssh:{
+      //     publicKeys: [
+      //       {
+      //         path:'/home/chpinoto/.ssh/authorized_keys'
+      //         keyData: sshkey.properties.publicKey
+      //       }
+      //     ]
+      //   }
+      // }
     }
     networkProfile: {
       networkInterfaces: [
@@ -100,28 +102,6 @@ resource vm 'Microsoft.Compute/virtualMachines@2022-11-01' = {
         }
       ]
     }
-  }
-}
-
-resource vmaadextension 'Microsoft.Compute/virtualMachines/extensions@2022-11-01' = {
-  parent: vm
-  name: 'AADSSHLoginForLinux'
-  location: location
-  properties: {
-    publisher: 'Microsoft.Azure.ActiveDirectory'
-    type: 'AADSSHLoginForLinux'
-    typeHandlerVersion: '1.0'
-  }
-}
-
-resource nwagentextension 'Microsoft.Compute/virtualMachines/extensions@2022-11-01' = {
-  parent: vm
-  name: 'NetworkWatcherAgentLinux'
-  location: location
-  properties: {
-    publisher: 'Microsoft.Azure.NetworkWatcher'
-    type: 'NetworkWatcherAgentLinux'
-    typeHandlerVersion: '1.4'
   }
 }
 

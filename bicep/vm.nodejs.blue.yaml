@@ -24,4 +24,4 @@ runcmd:
   - 'npm install'
   - 'npm install pm2 -g'
   - 'chmod +x server.js'
-  - 'pm2 start server.js -- ws.cptdagw.org 8000 3399ff' # blue
+  - 'pm2 start server.js -- ws.cptdagw.org 8000 3399ff blue'

@@ -1,13 +1,15 @@
 targetScope='subscription'
 
 var parameters = json(loadTextContent('parameters.json'))
+
 param ipsettings object = {
   vnet: '10.1.0.0/16'
   prefix: '10.1.0.0/24'
   AzureBastionSubnet: '10.1.1.0/24'
   agw: '10.1.2.0/24' 
+  vmss:'10.1.3.0/24'
   agwfrontendip: '10.1.2.4'
-  agwbackendip: '10.1.0.4'
+  prefixvmwin: '10.1.0.4'
 }
 
 // var location = resourceGroup().location
@@ -34,7 +36,7 @@ module vnetModule 'bicep/vnet.bicep' = {
   ]
 }
 
-module vmModule 'bicep/vm.nodejs.bicep' = {
+module vmModule 'bicep/vm.win.bicep' = {
   scope: resourceGroup(prefix)
   name: 'vmDeploy'
   params: {
@@ -43,22 +45,8 @@ module vmModule 'bicep/vm.nodejs.bicep' = {
     username: parameters.username
     password: parameters.password
     myObjectId: myobjectid
-    postfix: 'nodejs'
-    privateip: ipsettings.agwbackendip
-  }
-  dependsOn:[
-    vnetModule
-  ]
-}
-
-module sabModule 'bicep/sab.bicep' = {
-  scope: resourceGroup(prefix)
-  name: 'sabDeploy'
-  params: {
-    prefix: prefix
-    location: location
-    myip: myip
-    myObjectId: myobjectid
+    postfix: 'win'
+    privateip: ipsettings.prefixvmwin
   }
   dependsOn:[
     vnetModule
@@ -71,25 +59,70 @@ module agwModule 'bicep/agw.bicep' = {
   params: {
     prefix: prefix
     location: location
-    cnCertificateFrontend: parameters.cnCertificateFrontend
-    certpassword: parameters.certpassword
-    cnCABackend: parameters.cnCABackend
+    hostname: '${prefix}.org'
     frontendip: ipsettings.agwfrontendip
-    backendip: ipsettings.agwbackendip
+    backendhttpport: 8000
   }
   dependsOn:[
-    sabModule
+    vnetModule
   ]
 }
 
-module lawModule 'bicep/law.bicep' = {
+module vmssBlueModule 'bicep/vmss.bicep' = {
   scope: resourceGroup(prefix)
-  name: 'lawDeploy'
-  params:{
+  name: 'vmssBlueDeploy' 
+  params: {
+    location: location 
+    postfix: 'blue'
     prefix: prefix
-    location: location
+    password:parameters.password
+    username:parameters.username
+    customData: loadTextContent('bicep/vm.nodejs.blue.yaml')
+    isagwbackend: true
   }
   dependsOn:[
     agwModule
   ]
 }
+
+module vmssGreenModule 'bicep/vmss.bicep' = {
+  scope: resourceGroup(prefix)
+  name: 'vmssGreenDeploy' 
+  params: {
+    location: location 
+    postfix: 'green'
+    prefix: prefix
+    password:parameters.password
+    username:parameters.username
+    customData: loadTextContent('bicep/vm.nodejs.green.yaml')
+  }
+  dependsOn:[
+    agwModule
+  ]
+}
+
+// module sabModule 'bicep/sab.bicep' = {
+//   scope: resourceGroup(prefix)
+//   name: 'sabDeploy'
+//   params: {
+//     prefix: prefix
+//     location: location
+//     myip: myip
+//     myObjectId: myobjectid
+//   }
+//   dependsOn:[
+//     vnetModule
+//   ]
+// }
+
+// module lawModule 'bicep/law.bicep' = {
+//   scope: resourceGroup(prefix)
+//   name: 'lawDeploy'
+//   params:{
+//     prefix: prefix
+//     location: location
+//   }
+//   dependsOn:[
+//     agwModule
+//   ]
+// }

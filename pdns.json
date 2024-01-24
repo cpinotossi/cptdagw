@@ -1,0 +1,163 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "privateDnsZones_cptdagw_io_name": {
+            "defaultValue": "cptdagw.io",
+            "type": "String"
+        },
+        "virtualNetworks_cptdagw_externalid": {
+            "defaultValue": "/subscriptions/f474dec9-5bab-47a3-b4d3-e641dac87ddb/resourceGroups/cptdagw/providers/Microsoft.Network/virtualNetworks/cptdagw",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Network/privateDnsZones",
+            "apiVersion": "2018-09-01",
+            "name": "[parameters('privateDnsZones_cptdagw_io_name')]",
+            "location": "global",
+            "properties": {
+                "maxNumberOfRecordSets": 25000,
+                "maxNumberOfVirtualNetworkLinks": 1000,
+                "maxNumberOfVirtualNetworkLinksWithRegistration": 100,
+                "numberOfRecordSets": 7,
+                "numberOfVirtualNetworkLinks": 1,
+                "numberOfVirtualNetworkLinksWithRegistration": 1,
+                "provisioningState": "Succeeded"
+            }
+        },
+        {
+            "type": "Microsoft.Network/privateDnsZones/A",
+            "apiVersion": "2018-09-01",
+            "name": "[concat(parameters('privateDnsZones_cptdagw_io_name'), '/cptdagw000000')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/privateDnsZones', parameters('privateDnsZones_cptdagw_io_name'))]"
+            ],
+            "properties": {
+                "ttl": 10,
+                "aRecords": [
+                    {
+                        "ipv4Address": "10.1.3.4"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/privateDnsZones/A",
+            "apiVersion": "2018-09-01",
+            "name": "[concat(parameters('privateDnsZones_cptdagw_io_name'), '/cptdagwlin')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/privateDnsZones', parameters('privateDnsZones_cptdagw_io_name'))]"
+            ],
+            "properties": {
+                "ttl": 10,
+                "aRecords": [
+                    {
+                        "ipv4Address": "10.1.0.4"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/privateDnsZones/A",
+            "apiVersion": "2018-09-01",
+            "name": "[concat(parameters('privateDnsZones_cptdagw_io_name'), '/cptdagwwin')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/privateDnsZones', parameters('privateDnsZones_cptdagw_io_name'))]"
+            ],
+            "properties": {
+                "ttl": 10,
+                "aRecords": [
+                    {
+                        "ipv4Address": "10.1.0.5"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/privateDnsZones/A",
+            "apiVersion": "2018-09-01",
+            "name": "[concat(parameters('privateDnsZones_cptdagw_io_name'), '/vm000000')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/privateDnsZones', parameters('privateDnsZones_cptdagw_io_name'))]"
+            ],
+            "properties": {
+                "ttl": 10,
+                "aRecords": [
+                    {
+                        "ipv4Address": "10.1.2.5"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/privateDnsZones/A",
+            "apiVersion": "2018-09-01",
+            "name": "[concat(parameters('privateDnsZones_cptdagw_io_name'), '/vm000001')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/privateDnsZones', parameters('privateDnsZones_cptdagw_io_name'))]"
+            ],
+            "properties": {
+                "ttl": 10,
+                "aRecords": [
+                    {
+                        "ipv4Address": "10.1.2.6"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/privateDnsZones/A",
+            "apiVersion": "2018-09-01",
+            "name": "[concat(parameters('privateDnsZones_cptdagw_io_name'), '/ws')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/privateDnsZones', parameters('privateDnsZones_cptdagw_io_name'))]"
+            ],
+            "properties": {
+                "ttl": 10,
+                "aRecords": [
+                    {
+                        "ipv4Address": "10.1.2.4"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/privateDnsZones/SOA",
+            "apiVersion": "2018-09-01",
+            "name": "[concat(parameters('privateDnsZones_cptdagw_io_name'), '/@')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/privateDnsZones', parameters('privateDnsZones_cptdagw_io_name'))]"
+            ],
+            "properties": {
+                "ttl": 3600,
+                "soaRecord": {
+                    "email": "azureprivatedns-host.microsoft.com",
+                    "expireTime": 2419200,
+                    "host": "azureprivatedns.net",
+                    "minimumTtl": 10,
+                    "refreshTime": 3600,
+                    "retryTime": 300,
+                    "serialNumber": 1
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+            "apiVersion": "2018-09-01",
+            "name": "[concat(parameters('privateDnsZones_cptdagw_io_name'), '/cptdagw')]",
+            "location": "global",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/privateDnsZones', parameters('privateDnsZones_cptdagw_io_name'))]"
+            ],
+            "properties": {
+                "registrationEnabled": true,
+                "virtualNetwork": {
+                    "id": "[parameters('virtualNetworks_cptdagw_externalid')]"
+                }
+            }
+        }
+    ]
+}

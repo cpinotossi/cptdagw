@@ -1,0 +1,393 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "applicationGateways_cptdagw_name": {
+            "defaultValue": "cptdagw",
+            "type": "String"
+        },
+        "virtualNetworks_cptdagw_externalid": {
+            "defaultValue": "/subscriptions/f474dec9-5bab-47a3-b4d3-e641dac87ddb/resourceGroups/cptdagw/providers/Microsoft.Network/virtualNetworks/cptdagw",
+            "type": "String"
+        },
+        "publicIPAddresses_cptdagwagw_externalid": {
+            "defaultValue": "/subscriptions/f474dec9-5bab-47a3-b4d3-e641dac87ddb/resourceGroups/cptdagw/providers/Microsoft.Network/publicIPAddresses/cptdagwagw",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Network/applicationGateways",
+            "apiVersion": "2022-11-01",
+            "name": "[parameters('applicationGateways_cptdagw_name')]",
+            "location": "eastus",
+            "identity": {
+                "type": "UserAssigned",
+                "userAssignedIdentities": {
+                    "/subscriptions/f474dec9-5bab-47a3-b4d3-e641dac87ddb/resourcegroups/cptdagw/providers/Microsoft.ManagedIdentity/userAssignedIdentities/cptdagw": {}
+                }
+            },
+            "properties": {
+                "sku": {
+                    "name": "Standard_v2",
+                    "tier": "Standard_v2",
+                    "capacity": 1
+                },
+                "gatewayIPConfigurations": [
+                    {
+                        "name": "[parameters('applicationGateways_cptdagw_name')]",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), concat('/gatewayIPConfigurations/', parameters('applicationGateways_cptdagw_name')))]",
+                        "properties": {
+                            "subnet": {
+                                "id": "[concat(parameters('virtualNetworks_cptdagw_externalid'), concat('/subnets/', parameters('applicationGateways_cptdagw_name'), 'agw'))]"
+                            }
+                        }
+                    }
+                ],
+                "sslCertificates": [],
+                "trustedRootCertificates": [],
+                "trustedClientCertificates": [],
+                "sslProfiles": [],
+                "frontendIPConfigurations": [
+                    {
+                        "name": "frontendIPConfigurationPublic",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/frontendIPConfigurations/frontendIPConfigurationPublic')]",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[parameters('publicIPAddresses_cptdagwagw_externalid')]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "frontendIPConfigurationPrivate",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/frontendIPConfigurations/frontendIPConfigurationPrivate')]",
+                        "properties": {
+                            "privateIPAddress": "10.1.2.4",
+                            "privateIPAllocationMethod": "Static",
+                            "subnet": {
+                                "id": "[concat(parameters('virtualNetworks_cptdagw_externalid'), concat('/subnets/', parameters('applicationGateways_cptdagw_name'), 'agw'))]"
+                            }
+                        }
+                    }
+                ],
+                "frontendPorts": [
+                    {
+                        "name": "frontendportHttp",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/frontendPorts/frontendportHttp')]",
+                        "properties": {
+                            "port": 8000
+                        }
+                    },
+                    {
+                        "name": "port_80",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/frontendPorts/port_80')]",
+                        "properties": {
+                            "port": 80
+                        }
+                    }
+                ],
+                "backendAddressPools": [
+                    {
+                        "name": "backendaddresspool",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/backendAddressPools/backendaddresspool')]",
+                        "properties": {
+                            "backendAddresses": []
+                        }
+                    },
+                    {
+                        "name": "green",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/backendAddressPools/green')]",
+                        "properties": {
+                            "backendAddresses": []
+                        }
+                    },
+                    {
+                        "name": "blue",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/backendAddressPools/blue')]",
+                        "properties": {
+                            "backendAddresses": []
+                        }
+                    }
+                ],
+                "loadDistributionPolicies": [],
+                "backendHttpSettingsCollection": [
+                    {
+                        "name": "backendhttpsettingHttp",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/backendHttpSettingsCollection/backendhttpsettingHttp')]",
+                        "properties": {
+                            "port": 8000,
+                            "protocol": "Http",
+                            "cookieBasedAffinity": "Enabled",
+                            "connectionDraining": {
+                                "enabled": true,
+                                "drainTimeoutInSec": 3600
+                            },
+                            "pickHostNameFromBackendAddress": false,
+                            "affinityCookieName": "ApplicationGatewayAffinity",
+                            "requestTimeout": 30,
+                            "probe": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/probes/healthprobeHttp')]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "blue",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/backendHttpSettingsCollection/blue')]",
+                        "properties": {
+                            "port": 8000,
+                            "protocol": "Http",
+                            "cookieBasedAffinity": "Enabled",
+                            "connectionDraining": {
+                                "enabled": true,
+                                "drainTimeoutInSec": 60
+                            },
+                            "pickHostNameFromBackendAddress": false,
+                            "affinityCookieName": "ApplicationGatewayAffinity",
+                            "requestTimeout": 20,
+                            "probe": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/probes/blue')]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "green",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/backendHttpSettingsCollection/green')]",
+                        "properties": {
+                            "port": 8000,
+                            "protocol": "Http",
+                            "cookieBasedAffinity": "Disabled",
+                            "pickHostNameFromBackendAddress": false,
+                            "requestTimeout": 20,
+                            "probe": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/probes/green')]"
+                            }
+                        }
+                    }
+                ],
+                "backendSettingsCollection": [],
+                "httpListeners": [
+                    {
+                        "name": "httplistenerHttp",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/httpListeners/httplistenerHttp')]",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/frontendIPConfigurations/frontendIPConfigurationPublic')]"
+                            },
+                            "frontendPort": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/frontendPorts/frontendportHttp')]"
+                            },
+                            "protocol": "Http",
+                            "hostNames": [],
+                            "requireServerNameIndication": false
+                        }
+                    },
+                    {
+                        "name": "green",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/httpListeners/green')]",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/frontendIPConfigurations/frontendIPConfigurationPublic')]"
+                            },
+                            "frontendPort": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/frontendPorts/port_80')]"
+                            },
+                            "protocol": "Http",
+                            "hostName": "[concat('green.', parameters('applicationGateways_cptdagw_name'), '.org')]",
+                            "hostNames": [],
+                            "requireServerNameIndication": false
+                        }
+                    },
+                    {
+                        "name": "blue",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/httpListeners/blue')]",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/frontendIPConfigurations/frontendIPConfigurationPublic')]"
+                            },
+                            "frontendPort": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/frontendPorts/port_80')]"
+                            },
+                            "protocol": "Http",
+                            "hostName": "[concat('blue.', parameters('applicationGateways_cptdagw_name'), '.org')]",
+                            "hostNames": [],
+                            "requireServerNameIndication": false
+                        }
+                    }
+                ],
+                "listeners": [],
+                "urlPathMaps": [
+                    {
+                        "name": "green",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/urlPathMaps/green')]",
+                        "properties": {
+                            "defaultBackendAddressPool": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/backendAddressPools/green')]"
+                            },
+                            "defaultBackendHttpSettings": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/backendHttpSettingsCollection/green')]"
+                            },
+                            "pathRules": [
+                                {
+                                    "name": "blue",
+                                    "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/urlPathMaps/green/pathRules/blue')]",
+                                    "properties": {
+                                        "paths": [
+                                            "/blue/*"
+                                        ],
+                                        "backendAddressPool": {
+                                            "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/backendAddressPools/blue')]"
+                                        },
+                                        "backendHttpSettings": {
+                                            "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/backendHttpSettingsCollection/backendhttpsettingHttp')]"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "blue",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/urlPathMaps/blue')]",
+                        "properties": {
+                            "defaultBackendAddressPool": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/backendAddressPools/blue')]"
+                            },
+                            "defaultBackendHttpSettings": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/backendHttpSettingsCollection/blue')]"
+                            },
+                            "pathRules": [
+                                {
+                                    "name": "green",
+                                    "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/urlPathMaps/blue/pathRules/green')]",
+                                    "properties": {
+                                        "paths": [
+                                            "/green/*"
+                                        ],
+                                        "backendAddressPool": {
+                                            "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/backendAddressPools/green')]"
+                                        },
+                                        "backendHttpSettings": {
+                                            "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/backendHttpSettingsCollection/backendhttpsettingHttp')]"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "requestRoutingRules": [
+                    {
+                        "name": "green",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/requestRoutingRules/green')]",
+                        "properties": {
+                            "ruleType": "PathBasedRouting",
+                            "priority": 2000,
+                            "httpListener": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/httpListeners/green')]"
+                            },
+                            "urlPathMap": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/urlPathMaps/green')]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "blue",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/requestRoutingRules/blue')]",
+                        "properties": {
+                            "ruleType": "PathBasedRouting",
+                            "priority": 2002,
+                            "httpListener": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/httpListeners/blue')]"
+                            },
+                            "urlPathMap": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/urlPathMaps/blue')]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "requestroutingruleHttp",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/requestRoutingRules/requestroutingruleHttp')]",
+                        "properties": {
+                            "ruleType": "Basic",
+                            "priority": 10010,
+                            "httpListener": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/httpListeners/httplistenerHttp')]"
+                            },
+                            "backendAddressPool": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/backendAddressPools/backendaddresspool')]"
+                            },
+                            "backendHttpSettings": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/backendHttpSettingsCollection/backendhttpsettingHttp')]"
+                            }
+                        }
+                    }
+                ],
+                "routingRules": [],
+                "probes": [
+                    {
+                        "name": "healthprobeHttp",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/probes/healthprobeHttp')]",
+                        "properties": {
+                            "protocol": "Http",
+                            "host": "[concat(parameters('applicationGateways_cptdagw_name'), '.org')]",
+                            "path": "/blue",
+                            "interval": 30,
+                            "timeout": 30,
+                            "unhealthyThreshold": 3,
+                            "pickHostNameFromBackendHttpSettings": false,
+                            "minServers": 0,
+                            "match": {
+                                "statusCodes": [
+                                    "200-399"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "green",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/probes/green')]",
+                        "properties": {
+                            "protocol": "Http",
+                            "host": "green.cptdev.com",
+                            "path": "/green",
+                            "interval": 30,
+                            "timeout": 30,
+                            "unhealthyThreshold": 3,
+                            "pickHostNameFromBackendHttpSettings": false,
+                            "minServers": 0,
+                            "match": {
+                                "statusCodes": [
+                                    "200-399"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "blue",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdagw_name')), '/probes/blue')]",
+                        "properties": {
+                            "protocol": "Http",
+                            "host": "blue.cptdev.com",
+                            "path": "/blue",
+                            "interval": 30,
+                            "timeout": 30,
+                            "unhealthyThreshold": 3,
+                            "pickHostNameFromBackendHttpSettings": false,
+                            "minServers": 0,
+                            "match": {
+                                "statusCodes": [
+                                    "200-399"
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "rewriteRuleSets": [],
+                "redirectConfigurations": [],
+                "privateLinkConfigurations": []
+            }
+        }
+    ]
+}

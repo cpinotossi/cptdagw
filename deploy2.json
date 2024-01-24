@@ -1,0 +1,373 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "virtualNetworks_cptdazagw_name": {
+            "defaultValue": "cptdazagw",
+            "type": "String"
+        },
+        "storageAccounts_cptdazagw_name": {
+            "defaultValue": "cptdazagw",
+            "type": "String"
+        },
+        "publicIPAddresses_cptdazagw_name": {
+            "defaultValue": "cptdazagw",
+            "type": "String"
+        },
+        "applicationGateways_cptdazagw_name": {
+            "defaultValue": "cptdazagw",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2022-09-01",
+            "name": "[parameters('publicIPAddresses_cptdazagw_name')]",
+            "location": "eastus",
+            "sku": {
+                "name": "Standard",
+                "tier": "Regional"
+            },
+            "properties": {
+                "ipAddress": "4.246.190.128",
+                "publicIPAddressVersion": "IPv4",
+                "publicIPAllocationMethod": "Static",
+                "idleTimeoutInMinutes": 4,
+                "ipTags": []
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2022-09-01",
+            "name": "[parameters('storageAccounts_cptdazagw_name')]",
+            "location": "eastus",
+            "sku": {
+                "name": "Standard_LRS",
+                "tier": "Standard"
+            },
+            "kind": "StorageV2",
+            "properties": {
+                "dnsEndpointType": "Standard",
+                "defaultToOAuthAuthentication": false,
+                "publicNetworkAccess": "Enabled",
+                "allowCrossTenantReplication": true,
+                "minimumTlsVersion": "TLS1_2",
+                "allowBlobPublicAccess": false,
+                "allowSharedKeyAccess": true,
+                "networkAcls": {
+                    "bypass": "AzureServices",
+                    "virtualNetworkRules": [],
+                    "ipRules": [],
+                    "defaultAction": "Allow"
+                },
+                "supportsHttpsTrafficOnly": false,
+                "encryption": {
+                    "requireInfrastructureEncryption": false,
+                    "services": {
+                        "file": {
+                            "keyType": "Account",
+                            "enabled": true
+                        },
+                        "blob": {
+                            "keyType": "Account",
+                            "enabled": true
+                        }
+                    },
+                    "keySource": "Microsoft.Storage"
+                },
+                "accessTier": "Hot"
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/blobServices",
+            "apiVersion": "2022-09-01",
+            "name": "[concat(parameters('storageAccounts_cptdazagw_name'), '/default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_cptdazagw_name'))]"
+            ],
+            "sku": {
+                "name": "Standard_LRS",
+                "tier": "Standard"
+            },
+            "properties": {
+                "changeFeed": {
+                    "enabled": false
+                },
+                "restorePolicy": {
+                    "enabled": false
+                },
+                "containerDeleteRetentionPolicy": {
+                    "enabled": false
+                },
+                "cors": {
+                    "corsRules": []
+                },
+                "deleteRetentionPolicy": {
+                    "allowPermanentDelete": false,
+                    "enabled": false
+                },
+                "isVersioningEnabled": false
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/fileServices",
+            "apiVersion": "2022-09-01",
+            "name": "[concat(parameters('storageAccounts_cptdazagw_name'), '/default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_cptdazagw_name'))]"
+            ],
+            "sku": {
+                "name": "Standard_LRS",
+                "tier": "Standard"
+            },
+            "properties": {
+                "protocolSettings": {
+                    "smb": {}
+                },
+                "cors": {
+                    "corsRules": []
+                },
+                "shareDeleteRetentionPolicy": {
+                    "enabled": false,
+                    "days": 0
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/queueServices",
+            "apiVersion": "2022-09-01",
+            "name": "[concat(parameters('storageAccounts_cptdazagw_name'), '/default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_cptdazagw_name'))]"
+            ],
+            "properties": {
+                "cors": {
+                    "corsRules": []
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/tableServices",
+            "apiVersion": "2022-09-01",
+            "name": "[concat(parameters('storageAccounts_cptdazagw_name'), '/default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_cptdazagw_name'))]"
+            ],
+            "properties": {
+                "cors": {
+                    "corsRules": []
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Network/applicationGateways",
+            "apiVersion": "2022-09-01",
+            "name": "[parameters('applicationGateways_cptdazagw_name')]",
+            "location": "eastus",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_cptdazagw_name'), 'default')]",
+                "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddresses_cptdazagw_name'))]"
+            ],
+            "properties": {
+                "sku": {
+                    "name": "Standard_v2",
+                    "tier": "Standard_v2"
+                },
+                "gatewayIPConfigurations": [
+                    {
+                        "name": "appGatewayIpConfig",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdazagw_name')), '/gatewayIPConfigurations/appGatewayIpConfig')]",
+                        "properties": {
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_cptdazagw_name'), 'default')]"
+                            }
+                        }
+                    }
+                ],
+                "sslCertificates": [],
+                "trustedRootCertificates": [],
+                "trustedClientCertificates": [],
+                "sslProfiles": [],
+                "frontendIPConfigurations": [
+                    {
+                        "name": "appGwPublicFrontendIpIPv4",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdazagw_name')), '/frontendIPConfigurations/appGwPublicFrontendIpIPv4')]",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddresses_cptdazagw_name'))]"
+                            }
+                        }
+                    }
+                ],
+                "frontendPorts": [
+                    {
+                        "name": "port_80",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdazagw_name')), '/frontendPorts/port_80')]",
+                        "properties": {
+                            "port": 80
+                        }
+                    }
+                ],
+                "backendAddressPools": [
+                    {
+                        "name": "[concat(parameters('applicationGateways_cptdazagw_name'), '001')]",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdazagw_name')), concat('/backendAddressPools/', parameters('applicationGateways_cptdazagw_name'), '001'))]",
+                        "properties": {
+                            "backendAddresses": []
+                        }
+                    }
+                ],
+                "loadDistributionPolicies": [],
+                "backendHttpSettingsCollection": [
+                    {
+                        "name": "[parameters('applicationGateways_cptdazagw_name')]",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdazagw_name')), concat('/backendHttpSettingsCollection/', parameters('applicationGateways_cptdazagw_name')))]",
+                        "properties": {
+                            "port": 80,
+                            "protocol": "Http",
+                            "cookieBasedAffinity": "Disabled",
+                            "pickHostNameFromBackendAddress": true,
+                            "requestTimeout": 20
+                        }
+                    }
+                ],
+                "backendSettingsCollection": [],
+                "httpListeners": [
+                    {
+                        "name": "[parameters('applicationGateways_cptdazagw_name')]",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdazagw_name')), concat('/httpListeners/', parameters('applicationGateways_cptdazagw_name')))]",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdazagw_name')), '/frontendIPConfigurations/appGwPublicFrontendIpIPv4')]"
+                            },
+                            "frontendPort": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdazagw_name')), '/frontendPorts/port_80')]"
+                            },
+                            "protocol": "Http",
+                            "hostNames": [],
+                            "requireServerNameIndication": false
+                        }
+                    }
+                ],
+                "listeners": [],
+                "urlPathMaps": [
+                    {
+                        "name": "[parameters('applicationGateways_cptdazagw_name')]",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdazagw_name')), concat('/urlPathMaps/', parameters('applicationGateways_cptdazagw_name')))]",
+                        "properties": {
+                            "defaultBackendAddressPool": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdazagw_name')), concat('/backendAddressPools/', parameters('applicationGateways_cptdazagw_name'), '001'))]"
+                            },
+                            "defaultBackendHttpSettings": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdazagw_name')), concat('/backendHttpSettingsCollection/', parameters('applicationGateways_cptdazagw_name')))]"
+                            },
+                            "pathRules": [
+                                {
+                                    "name": "[parameters('applicationGateways_cptdazagw_name')]",
+                                    "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdazagw_name')), concat('/urlPathMaps/', parameters('applicationGateways_cptdazagw_name'), '/pathRules/', parameters('applicationGateways_cptdazagw_name')))]",
+                                    "properties": {
+                                        "paths": [
+                                            "/001*"
+                                        ],
+                                        "backendAddressPool": {
+                                            "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdazagw_name')), concat('/backendAddressPools/', parameters('applicationGateways_cptdazagw_name'), '001'))]"
+                                        },
+                                        "backendHttpSettings": {
+                                            "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdazagw_name')), concat('/backendHttpSettingsCollection/', parameters('applicationGateways_cptdazagw_name')))]"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "requestRoutingRules": [
+                    {
+                        "name": "[parameters('applicationGateways_cptdazagw_name')]",
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdazagw_name')), concat('/requestRoutingRules/', parameters('applicationGateways_cptdazagw_name')))]",
+                        "properties": {
+                            "ruleType": "PathBasedRouting",
+                            "priority": 10,
+                            "httpListener": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdazagw_name')), concat('/httpListeners/', parameters('applicationGateways_cptdazagw_name')))]"
+                            },
+                            "urlPathMap": {
+                                "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdazagw_name')), concat('/urlPathMaps/', parameters('applicationGateways_cptdazagw_name')))]"
+                            }
+                        }
+                    }
+                ],
+                "routingRules": [],
+                "probes": [],
+                "rewriteRuleSets": [],
+                "redirectConfigurations": [],
+                "privateLinkConfigurations": [],
+                "enableHttp2": false,
+                "autoscaleConfiguration": {
+                    "minCapacity": 0,
+                    "maxCapacity": 10
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2022-09-01",
+            "name": "[parameters('virtualNetworks_cptdazagw_name')]",
+            "location": "eastus",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_cptdazagw_name'), 'default')]",
+                "[resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdazagw_name'))]"
+            ],
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "10.3.0.0/16"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "default",
+                        "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_cptdazagw_name'), 'default')]",
+                        "properties": {
+                            "addressPrefix": "10.3.0.0/24",
+                            "applicationGatewayIPConfigurations": [
+                                {
+                                    "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdazagw_name')), '/gatewayIPConfigurations/appGatewayIpConfig')]"
+                                }
+                            ],
+                            "delegations": [],
+                            "privateEndpointNetworkPolicies": "Disabled",
+                            "privateLinkServiceNetworkPolicies": "Enabled"
+                        },
+                        "type": "Microsoft.Network/virtualNetworks/subnets"
+                    }
+                ],
+                "virtualNetworkPeerings": [],
+                "enableDdosProtection": false
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "apiVersion": "2022-09-01",
+            "name": "[concat(parameters('virtualNetworks_cptdazagw_name'), '/default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworks_cptdazagw_name'))]",
+                "[resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdazagw_name'))]"
+            ],
+            "properties": {
+                "addressPrefix": "10.3.0.0/24",
+                "applicationGatewayIPConfigurations": [
+                    {
+                        "id": "[concat(resourceId('Microsoft.Network/applicationGateways', parameters('applicationGateways_cptdazagw_name')), '/gatewayIPConfigurations/appGatewayIpConfig')]"
+                    }
+                ],
+                "delegations": [],
+                "privateEndpointNetworkPolicies": "Disabled",
+                "privateLinkServiceNetworkPolicies": "Enabled"
+            }
+        }
+    ]
+}

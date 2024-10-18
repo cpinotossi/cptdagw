@@ -211,6 +211,93 @@ X25519 (ECDH Key Exchange) with ED25519 (Digital signatures).
 
 TBD
 
+## Application Gateway rewrite location header
+
+Good help from https://medium.com/objectsharp/azure-application-gateway-http-headers-rewrite-rules-for-app-service-with-aad-authentication-b1092a58b60
+
+All resource have been generated via the Azure Portal.
+Use the server certificates from the repo cptdjsserver/openssl.
+
+~~~pwsh
+$prefix="cptdazappgw"
+$location="northeurope"
+$myIp=(Invoke-RestMethod -Uri "http://ipv4.icanhazip.com").Trim()
+$myObjectId=az ad signed-in-user show --query id -o tsv
+$vmId=(az vm show -n $prefix -g $prefix --query id -o tsv)
+az network bastion ssh -n $prefix -g $prefix --target-resource-id $vmId --auth-type AAD
+~~~
+
+
+Inside the Linux VM
+~~~bash
+curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - 
+sudo apt-get install -y nodejs
+sudo npm install -g npm@8.5.2
+# Implement Node.js Server to run as service via pm2
+git clone https://github.com/cpinotossi/cptdjsserver.git
+cd cptdjsserver
+npm install
+echo "DOMAIN=cptdev.com" >> ~/.env
+sudo su
+npm install pm2 -g
+logout
+  - 'chmod +x server.js'
+pm2 start server.js
+pm2 status
+curl -v http://localhost/redirect
+curl -vk https://localhost/redirect
+pm2 logs server.js
+exit
+~~~
+
+~~~pwsh
+# get app gw public ip
+$agwPubIpId=az network public-ip show -n $prefix -g $prefix --query ipAddress -o tsv
+# We did create a corresponding DNS entry
+curl -vk https://www.cptdev.com/redirect # 302
+
+curl -vk https://$agwPubIpId/redirect # 404
+curl -vk https://$agwPubIpId/redirect -H "Host: www.cptdev.com" # 502
+curl -vk https://www.cptdev.com/redirect
+curl -vk --resolve www.cptdev.com:443:$agwPubIpId https://www.cptdev.com/redirect
+curl -v --cert-type PEM --cacert .\openssl\cptdev.com.ca.crt --resolve www.cptdev.com:443:$agwPubIpId https://www.cptdev.com/redirect
+curl -w %{certs} https://$agwPubIpId
+openssl s_client -connect ${agwPubIpId}:443
+~~~
+
+Before:
+expect: red.azurewebsites.net
+< Location: http://login.microsoftonline.com/organizations/oauth2/v2.0/authorize?client_id=fb233fd3-e840-4618-8e3a-e944b497b9d6&scope=user.read&response_type=code&response_mode=query&redirect_uri=https%3A%2F%2Fred.azurewebsites.net/redirect
+
+After:
+expect: www.cptdev.com
+< Location: http://login.microsoftonline.com/organizations/oauth2/v2.0/authorize?client_id=fb233fd3-e840-4618-8e3a-e944b497b9d6&scope=user.read&response_type=code&response_mode=query&redirect_uri=https%3A%2F%2Fwww.cptdev.com/redirect
+
+
+"rewriteRules": [
+    {
+        "ruleSequence": 100,
+        "conditions": [
+            {
+                "variable": "http_resp_Location",
+                "pattern": "(.*)(redirect_uri=https%3A%2F%2F).*\\.azurewebsites\\.net(.*)$",
+                "ignoreCase": true,
+                "negate": false
+            }
+        ],
+        "name": "[parameters('applicationGateways_cptdazappgw_name')]",
+        "actionSet": {
+            "requestHeaderConfigurations": [],
+            "responseHeaderConfigurations": [
+                {
+                    "headerName": "Location",
+                    "headerValue": "{http_resp_Location_1}{http_resp_Location_2}www.cptdev.com{http_resp_Location_3}"
+                }
+            ]
+        }
+    }
+]
+
 
 ### Git
 
